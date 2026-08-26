@@ -1,0 +1,32 @@
+# macOS
+.DS_Store
+
+# Python tooling (uv)
+.venv/
+__pycache__/
+*.pyc
+.pytest_cache/
+.ruff_cache/
+
+# Node (if any helper tooling is added)
+node_modules/
+
+# Derived search/index artifacts (regenerable from concepts/)
+/tools/**/index.json
+
+# SQLite WAL artifacts (regenerable)
+tools/channel_check.db-shm
+tools/channel_check.db-wal
+tools/channel_check.db
+
+# DuckDB SQL cache (regenerable)
+tools/sql_cache.duckdb
+tools/sql_cache.duckdb-wal
+tools/sql_cache.duckdb-shm
+
+# Docling extraction artifacts (regenerable)
+.book_to_skill/
+
+# Obsidian editor state
+.obsidian/workspace.json
+.obsidian/workspace-mobile.json

@@ -1,0 +1,5 @@
+#!/bin/sh
+# Thin wrapper so you can run `okf ...` instead of `python3 tools/okf.py ...`.
+# Resolves this script's real location (following symlinks, e.g. ~/.local/bin/okf)
+# and runs the sibling okf.py with the same arguments.
+exec python3 "$(python3 -c 'import os, sys; print(os.path.join(os.path.dirname(os.path.realpath(sys.argv[1])), "okf.py"))' "$0")" "$@"

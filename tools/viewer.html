@@ -1,0 +1,432 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="utf-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1" />
+<title>OKF Brain — Concept Graph</title>
+<script src="https://cdn.jsdelivr.net/npm/cytoscape@3.28.1/dist/cytoscape.min.js"></script>
+<script src="https://cdn.jsdelivr.net/npm/marked@12.0.0/marked.min.js"></script>
+<style>
+  :root {
+    --bg: #14161c; --panel: #1c2030; --ink: #e7e9f0; --muted: #9aa3b2;
+    --edge: #39405a; --accent: #7aa2ff;
+  }
+  * { box-sizing: border-box; }
+  html, body { margin: 0; height: 100%; background: var(--bg); color: var(--ink);
+    font: 14px/1.5 -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif; }
+  #app { display: flex; flex-direction: column; height: 100vh; }
+  header { display: flex; gap: 10px; align-items: center; padding: 8px 14px;
+    background: var(--panel); border-bottom: 1px solid #2a3045; flex-wrap: wrap; flex-shrink: 0; }
+  header h1 { font-size: 15px; margin: 0 8px 0 0; font-weight: 600; }
+  header .spacer { flex: 1; }
+  label.toggle { display: inline-flex; gap: 6px; align-items: center; color: var(--muted); cursor: pointer; font-size: 13px; }
+  input[type=search], select, button { background: #11131a; border: 1px solid #2a3045; color: var(--ink);
+    border-radius: 6px; padding: 5px 8px; font-size: 13px; }
+  input[type=search] { width: 200px; }
+  select { max-width: 130px; }
+  button { cursor: pointer; background: #2a3045; }
+  button:hover { background: #343c57; }
+  main { display: flex; flex: 1; min-height: 0; }
+  #graph { flex: 1 1 58%; min-width: 0; position: relative; }
+  #detail { flex: 0 0 42%; overflow-y: auto; padding: 16px 20px; background: var(--panel); border-left: 1px solid #2a3045; }
+  #detail-empty { text-align: center; margin-top: 40px; color: var(--muted); }
+  .type-chip { display: inline-block; padding: 2px 8px; border-radius: 10px; font-size: 11px;
+    font-weight: 600; color: #fff; background: #94a3b8; text-transform: uppercase; letter-spacing: 0.5px; }
+  .detail-header h1 { font-size: 17px; margin: 4px 0 2px; font-weight: 600; }
+  .detail-header .muted { color: var(--muted); font-size: 12px; }
+  dl.frontmatter { display: grid; grid-template-columns: 88px 1fr; row-gap: 4px; column-gap: 10px;
+    margin: 8px 0 10px; font-size: 13px; }
+  dl.frontmatter dt { color: var(--muted); font-weight: 500; }
+  dl.frontmatter dd { margin: 0; }
+  dl.frontmatter a, #detail-body a { color: var(--accent); word-break: break-all; }
+  .tag { display: inline-block; padding: 1px 6px; margin: 0 4px 2px 0; border-radius: 4px;
+    background: #2a3045; color: var(--muted); font-size: 11px; }
+  hr { border: none; border-top: 1px solid #2a3045; margin: 12px 0; }
+  #detail-body { font-size: 13px; line-height: 1.55; }
+  #detail-body h1 { font-size: 15px; margin: 14px 0 6px; padding-bottom: 4px; border-bottom: 1px solid #2a3045; }
+  #detail-body h2 { font-size: 14px; margin: 12px 0 4px; }
+  #detail-body h3 { font-size: 13px; margin: 10px 0 4px; }
+  #detail-body p { margin: 6px 0; }
+  #detail-body code { background: #11131a; padding: 1px 4px; border-radius: 3px; font-size: 12px;
+    font-family: ui-monospace, "SF Mono", Consolas, monospace; }
+  #detail-body pre { background: #11131a; color: #d0d4e0; padding: 10px 12px; border-radius: 6px; overflow-x: auto; font-size: 12px; }
+  #detail-body pre code { background: transparent; color: inherit; padding: 0; }
+  #detail-body ul, #detail-body ol { padding-left: 20px; margin: 6px 0; }
+  #detail-body table { border-collapse: collapse; margin: 8px 0; }
+  #detail-body th, #detail-body td { border: 1px solid #2a3045; padding: 4px 8px; font-size: 12px; }
+  #detail-body a.internal { color: var(--accent); cursor: pointer; }
+  #detail-body a.external { color: var(--accent); }
+  #detail-backlinks { margin-top: 16px; }
+  #detail-backlinks h2 { font-size: 13px; color: var(--muted); margin-bottom: 6px; }
+  #detail-backlinks ul { padding-left: 18px; }
+  #detail-backlinks a { color: var(--accent); cursor: pointer; }
+  .legend { display: flex; gap: 8px; align-items: center; color: var(--muted); font-size: 12px; flex-wrap: wrap; }
+  .legend .sw { width: 10px; height: 10px; border-radius: 50%; display: inline-block; margin-right: 3px; vertical-align: -1px; }
+  #loadBtn { display: none; }
+  #file { display: none; }
+</style>
+</head>
+<body>
+<div id="app">
+  <header>
+    <h1>OKF Brain — Concept Graph</h1>
+    <span class="legend" id="legend"></span>
+    <span class="spacer"></span>
+    <label class="toggle"><input type="checkbox" id="hidePrivate" /> Hide private</label>
+    <input type="search" id="search" placeholder="Search title / id / tag" />
+    <select id="filter-type"><option value="">All types</option></select>
+    <select id="filter-domain"><option value="">All domains</option></select>
+    <select id="layout">
+      <option value="cose">cose (force)</option>
+      <option value="concentric">concentric</option>
+      <option value="breadthfirst">breadth-first</option>
+      <option value="circle">circle</option>
+      <option value="grid">grid</option>
+    </select>
+    <button id="reset">Reset view</button>
+    <button id="loadBtn">Load index.json</button>
+    <input type="file" id="file" accept="application/json,.json" hidden />
+    <span id="count" class="legend"></span>
+  </header>
+  <main>
+    <section id="graph"></section>
+    <section id="detail">
+      <div id="detail-empty">Click a node to see its details.</div>
+      <article id="detail-content" hidden>
+        <header class="detail-header">
+          <span class="type-chip" id="detail-type"></span>
+          <h1 id="detail-title"></h1>
+          <div class="muted" id="detail-id"></div>
+        </header>
+        <dl class="frontmatter">
+          <dt>Description</dt><dd id="detail-description"></dd>
+          <dt>Visibility</dt><dd id="detail-visibility"></dd>
+          <dt>Domain</dt><dd id="detail-domain"></dd>
+          <dt>Tags</dt><dd id="detail-tags"></dd>
+          <dt>Provenance</dt><dd id="detail-source"></dd>
+        </dl>
+        <hr>
+        <div id="detail-body"></div>
+        <section id="detail-backlinks" hidden>
+          <h2>Cited by</h2>
+          <ul id="backlinks-list"></ul>
+        </section>
+      </article>
+    </section>
+  </main>
+</div>
+<script>
+const DOMAIN_COLORS = {
+  life: "#7aa2ff", people: "#f0a868", orgs: "#c08cf0", documents: "#8cc6f0",
+  tools: "#5fd3a6", specs: "#e6cf6a", skills: "#f08c9e", learning: "#9be7a4",
+  creators: "#f0a868",
+};
+const VISIBILITY_PRIVATE_DEFAULT = false;
+
+function colorFor(d) { return DOMAIN_COLORS[d] || "#9aa3b2"; }
+
+function buildLegend() {
+  const el = document.getElementById("legend");
+  el.innerHTML = Object.entries(DOMAIN_COLORS)
+    .map(([k, v]) => `<span><span class="sw" style="background:${v}"></span>${k}</span>`).join("");
+}
+
+let bundle = null;
+let cy = null;
+let nodeIndex = {};
+let backlinks = {};
+
+function loadIndex(idx) {
+  const concepts = idx.concepts || [];
+  const ids = new Set(concepts.map(c => c.id));
+  nodeIndex = {};
+  backlinks = {};
+
+  // Build node data with sizes based on link count
+  const linkCounts = {};
+  for (const c of concepts) for (const l of (c.links || []))
+    if (ids.has(l)) { linkCounts[c.id] = (linkCounts[c.id]||0)+1; linkCounts[l] = (linkCounts[l]||0); }
+
+  const nodes = concepts.map(c => ({
+    data: {
+      id: c.id,
+      label: c.title || c.id,
+      type: c.type || "?",
+      visibility: c.visibility || "?",
+      domain: c.domain || "?",
+      description: c.description || "",
+      tags: c.tags || [],
+      source: c.source || [],
+      path: c.path || "",
+      links: c.links || [],
+      color: colorFor(c.domain),
+      size: 18 + Math.min(24, (linkCounts[c.id]||0) * 3),
+    }
+  }));
+
+  const edges = [];
+  for (const c of concepts) for (const t of (c.links || [])) {
+    if (ids.has(t)) {
+      edges.push({ data: { source: c.id, target: t } });
+      (backlinks[t] ||= []).push(c.id);
+    }
+  }
+
+  // Store bodies (we need to fetch them separately for file:// — but for served mode we have tf/etc in index)
+  // We'll show frontmatter + links as the detail body, since raw bodies aren't in the index
+  bundle = { nodes, edges, concepts };
+  document.getElementById("count").textContent = concepts.length ? `${concepts.length} concepts` : "";
+  buildTypeFilter(concepts);
+  buildDomainFilter(concepts);
+  renderGraph();
+}
+
+function buildTypeFilter(concepts) {
+  const select = document.getElementById("filter-type");
+  const types = [...new Set(concepts.map(c => c.type).filter(Boolean))].sort();
+  for (const t of types) {
+    const opt = document.createElement("option");
+    opt.value = t; opt.textContent = t;
+    select.appendChild(opt);
+  }
+}
+
+function buildDomainFilter(concepts) {
+  const select = document.getElementById("filter-domain");
+  const domains = [...new Set(concepts.map(c => c.domain).filter(Boolean))].sort();
+  for (const d of domains) {
+    const opt = document.createElement("option");
+    opt.value = d; opt.textContent = d;
+    select.appendChild(opt);
+  }
+}
+
+function visibleNodeIds() {
+  const hide = document.getElementById("hidePrivate").checked;
+  const typeFilter = document.getElementById("filter-type").value;
+  const domainFilter = document.getElementById("filter-domain").value;
+  const vis = new Set();
+  for (const n of bundle.nodes) {
+    const d = n.data;
+    if (hide && d.visibility === "private") continue;
+    if (typeFilter && d.type !== typeFilter) continue;
+    if (domainFilter && d.domain !== domainFilter) continue;
+    vis.add(d.id);
+  }
+  return vis;
+}
+
+function renderGraph() {
+  if (cy) cy.destroy();
+  const vis = visibleNodeIds();
+  const els = [
+    ...bundle.nodes.filter(n => vis.has(n.data.id)),
+    ...bundle.edges.filter(e => vis.has(e.data.source) && vis.has(e.data.target)),
+  ];
+
+  cy = cytoscape({
+    container: document.getElementById("graph"),
+    elements: els,
+    style: [
+      { selector: "node", style: {
+        "background-color": "data(color)",
+        "label": "data(label)",
+        "color": "#e7e9f0",
+        "font-size": 10,
+        "text-valign": "bottom", "text-margin-y": 3,
+        "text-wrap": "wrap", "text-max-width": 100,
+        "width": "data(size)", "height": "data(size)",
+        "border-width": 1, "border-color": "#0c0e14",
+      }},
+      { selector: "node: selected", style: { "border-width": 3, "border-color": "#f59e0b" }},
+      { selector: "node.private", style: { "border-style": "dashed", "border-color": "#64748b" }},
+      { selector: "edge", style: {
+        "width": 1, "line-color": "#39405a",
+        "target-arrow-color": "#39405a", "target-arrow-shape": "triangle",
+        "curve-style": "bezier", "arrow-scale": 0.7,
+      }},
+      { selector: ".dim", style: { "opacity": 0.12 }},
+    ],
+    layout: { name: document.getElementById("layout").value, animate: false, padding: 30 },
+    wheelSensitivity: 0.2,
+  });
+
+  cy.on("tap", "node", (evt) => showDetail(evt.target.id()));
+  cy.on("tap", (evt) => { if (evt.target === cy) clearSelection(); });
+}
+
+function clearSelection() {
+  if (cy) cy.elements().unselect();
+  document.getElementById("detail-empty").hidden = false;
+  document.getElementById("detail-content").hidden = true;
+}
+
+function showDetail(conceptId) {
+  const data = nodeIndex[conceptId] || (bundle && bundle.nodes.find(n => n.data.id === conceptId)?.data);
+  if (!data) return;
+  if (cy) { cy.elements().unselect(); cy.getElementById(conceptId)?.select(); }
+
+  document.getElementById("detail-empty").hidden = true;
+  document.getElementById("detail-content").hidden = false;
+
+  const chip = document.getElementById("detail-type");
+  chip.textContent = data.type || "?";
+  chip.style.background = data.color;
+
+  document.getElementById("detail-title").textContent = data.label;
+  document.getElementById("detail-id").textContent = data.id;
+  document.getElementById("detail-description").textContent = data.description || "—";
+  document.getElementById("detail-visibility").textContent = data.visibility || "—";
+  document.getElementById("detail-domain").textContent = data.domain || "—";
+
+  const tagsEl = document.getElementById("detail-tags");
+  tagsEl.innerHTML = "";
+  if (data.tags && data.tags.length) {
+    for (const t of data.tags) {
+      const span = document.createElement("span"); span.className = "tag"; span.textContent = t;
+      tagsEl.appendChild(span);
+    }
+  } else tagsEl.textContent = "—";
+
+  const srcEl = document.getElementById("detail-source");
+  srcEl.innerHTML = "";
+  if (data.source && data.source.length) {
+    for (const s of data.source) {
+      const code = document.createElement("code"); code.textContent = s;
+      srcEl.appendChild(code); srcEl.appendChild(document.createElement("br"));
+    }
+  } else srcEl.textContent = "—";
+
+  // Build a synthetic body from links since we don't have raw markdown bodies in the index
+  const bodyEl = document.getElementById("detail-body");
+  const links = data.links || [];
+  // Try to fetch the actual markdown body from the server
+  const bodyPath = "/concepts/" + conceptId + ".md";
+  if (bodyPath.startsWith("http") || window.location.protocol === "http:" || window.location.protocol === "https:") {
+    fetch(bodyPath).then(r => r.ok ? r.text() : null).then(text => {
+      if (text) {
+        // Strip frontmatter
+        const m = text.replace(/^---\n[\s\S]*?\n---\n/, "");
+        bodyEl.innerHTML = marked.parse(m, { breaks: false, gfm: true });
+        rewriteInternalLinks(bodyEl);
+      } else {
+        renderSyntheticBody(bodyEl, data);
+      }
+    }).catch(() => renderSyntheticBody(bodyEl, data));
+  } else {
+    renderSyntheticBody(bodyEl, data);
+  }
+
+  // Backlinks
+  const bl = backlinks[conceptId] || [];
+  const blSection = document.getElementById("detail-backlinks");
+  const blList = document.getElementById("backlinks-list");
+  blList.innerHTML = "";
+  if (bl.length) {
+    blSection.hidden = false;
+    for (const src of bl) {
+      const li = document.createElement("li");
+      const a = document.createElement("a"); a.textContent = nodeIndex[src]?.label || src;
+      a.addEventListener("click", () => showDetail(src));
+      li.appendChild(a);
+      const muted = document.createElement("span"); muted.className = "muted";
+      muted.textContent = ` (${src})`; li.appendChild(muted);
+      blList.appendChild(li);
+    }
+  } else blSection.hidden = true;
+
+  // cache nodeIndex for backlinks lookup
+  for (const n of bundle.nodes) nodeIndex[n.data.id] = n.data;
+  if (cy) cy.animate({ center: { eles: cy.getElementById(conceptId) }, zoom: Math.max(cy.zoom(), 0.8) }, { duration: 200 });
+}
+
+function renderSyntheticBody(el, data) {
+  const links = data.links || [];
+  let html = "";
+  if (links.length) {
+    html += "<h2>Links to</h2><ul>";
+    for (const l of links) {
+      html += `<li><a class="internal" data-target="${l}">${l}</a></li>`;
+    }
+    html += "</ul>";
+  }
+  if (data.path) {
+    html += `<h2>File</h2><p><code>${data.path}</code></p>`;
+  }
+  el.innerHTML = html || "<p class='muted'>No additional content.</p>";
+  el.querySelectorAll("a.internal").forEach(a => {
+    a.addEventListener("click", (e) => { e.preventDefault(); showDetail(a.dataset.target); });
+  });
+}
+
+function rewriteInternalLinks(root) {
+  root.querySelectorAll("a[href]").forEach(a => {
+    const href = a.getAttribute("href");
+    if (!href) return;
+    if (href.startsWith("/concepts/") && href.endsWith(".md")) {
+      const target = href.slice("/concepts/".length, -".md".length);
+      a.className = "internal";
+      a.setAttribute("href", "javascript:void(0)");
+      a.addEventListener("click", (e) => { e.preventDefault(); showDetail(target); });
+      return;
+    }
+    if (href.startsWith("/") || href.startsWith("http")) {
+      a.className = "external";
+      a.setAttribute("target", "_blank");
+      a.setAttribute("rel", "noopener");
+    }
+  });
+}
+
+// Event handlers
+document.getElementById("hidePrivate").addEventListener("change", () => renderGraph());
+document.getElementById("filter-type").addEventListener("change", () => renderGraph());
+document.getElementById("filter-domain").addEventListener("change", () => renderGraph());
+document.getElementById("layout").addEventListener("change", () => { if (cy) cy.layout({ name: document.getElementById("layout").value, animate: false, padding: 30 }).run(); });
+document.getElementById("reset").addEventListener("click", () => { if (cy) cy.fit(null, 30); clearSelection(); });
+
+document.getElementById("search").addEventListener("input", (e) => {
+  if (!cy) return;
+  const q = e.target.value.trim().toLowerCase();
+  if (!q) { cy.elements().removeClass("dim"); return; }
+  cy.nodes().forEach(n => {
+    const d = n.data();
+    const hay = (d.label||"").toLowerCase() + " " + d.id.toLowerCase() + " " + (d.tags||[]).join(" ").toLowerCase();
+    n.toggleClass("dim", !hay.includes(q));
+  });
+  cy.edges().forEach(edge => {
+    edge.toggleClass("dim", edge.source().hasClass("dim") || edge.target().hasClass("dim"));
+  });
+});
+
+document.getElementById("loadBtn").addEventListener("click", () => document.getElementById("file").click());
+document.getElementById("file").addEventListener("change", (e) => {
+  const f = e.target.files[0]; if (!f) return;
+  const r = new FileReader(); r.onload = () => loadIndex(JSON.parse(r.result)); r.readAsText(f);
+});
+
+// Pre-populate nodeIndex for backlinks
+function preindexNodes() {
+  if (!bundle) return;
+  for (const n of bundle.nodes) nodeIndex[n.data.id] = n.data;
+}
+
+buildLegend();
+// Auto-load: try fetch (works over http://), fall back to file:// button
+fetch("tools/index.json").then(r => r.ok ? r.json() : Promise.reject()).then(json => {
+  loadIndex(json);
+  preindexNodes();
+  // Show load button as fallback if fetch worked (in case they switch files)
+}).catch(() => {
+  document.getElementById("loadBtn").style.display = "inline-block";
+  document.getElementById("loadBtn").textContent = "Load index.json";
+  const empty = document.getElementById("detail-empty");
+  empty.innerHTML = "Run <code>python3 tools/okf.py index</code> then <code>python3 tools/okf.py view</code><br>or click <b>Load index.json</b> to select the file manually.";
+});
+
+// Override loadIndex to also preindex
+const _loadIndex = loadIndex;
+loadIndex = function(idx) { _loadIndex(idx); preindexNodes(); };
+</script>
+</body>
+</html>

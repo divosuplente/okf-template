@@ -233,7 +233,7 @@ Always prefer scripts for mechanical steps; never auto-assign domain/tags from k
 - Defaults: personal domains (`life`, `people`, `orgs`, `documents`, `work`) → `private`; others → `shareable`.
 - Any public bundle **must** exclude `private` concepts and review `raw/` / `log.md` / work notes.
 - Path policy for agents: `rules/path-access-control.md`.
-- Optional local context tools must not be required for other machines.
+- Optional local tools (e.g. ContextVC) must not be required for other machines.
 
 ---
 
@@ -241,7 +241,6 @@ Always prefer scripts for mechanical steps; never auto-assign domain/tags from k
 
 - Rationale: `decisions.md` (e.g. D-014 SSOT, D-015 privacy, D-017 ICM, D-018/D-019 agent-surface).
 - Ops log: `log.md`.
-- Historical audit notes: `VAULT-IMPROVEMENTS.md` (may be outdated; prefer IDENTITY/CONTEXT).
 
 ---
 

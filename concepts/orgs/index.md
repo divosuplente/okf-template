@@ -1,4 +1,4 @@
-# uorgs — Index
+# Orgs — Index
 
 Organizations.
 

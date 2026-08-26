@@ -14,7 +14,7 @@ description: |
 ## Workspace Structure
 `teaching/`
 - `LEARNING-PREFERENCES.md` — Universal user preferences (visual-first, dark mode, low bandwidth, real sources, frequency-driven).
-- `<topic>/` (e.g., `dutch/`, `japanese/`, `javascript/`)
+- `<topic>/` (e.g., `javascript/`, `python/`, `general/`)
   - `_MISSION.md`, `_NOTES.md`, `_RESOURCES.md`, `_GLOSSARY.md` — Topic context (prefixed `_` so Astro ignores them; still directly accessible as files).
   - `lessons/` — MDX lesson files (`0001-name.md`).
   - `reference/` — Cheat sheets, conjugation tables, glossaries.
@@ -83,7 +83,7 @@ Write a learning record to `_records/<topic>/` capturing the retrospective's key
 
 ## Lesson Creation Process
 1. **Calibrate:** Check `_records/<topic>/` & `_NOTES.md` for zone of proximal development.
-2. **Draft Lesson:** Create `<topic>/lessons/<NN>-name.md` (e.g., `dutch/lessons/0001-greetings.md`).
+2. **Draft Lesson:** Create `<topic>/lessons/<NN>-name.md` (e.g., `javascript/lessons/0001-variables.md`).
    - Frontmatter: `title`, `description`, `level` (e.g., "A0"), `duration` (e.g., "5 min"), `weight` (ordering number).
    - Focus on ONE tightly-scoped concept tied to the mission.
    - Include visual rules, real examples, memory tricks, and a micro-challenge.

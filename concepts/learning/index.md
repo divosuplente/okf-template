@@ -1,4 +1,4 @@
-# ulearning — Index
+# Learning — Index
 
 Articles, courses, talks.
 

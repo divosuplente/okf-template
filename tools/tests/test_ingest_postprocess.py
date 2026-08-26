@@ -7,7 +7,7 @@ import okf
 
 
 def test_garbage_slug_regex():
-    assert ip.GARBAGE_SLUG_RE.match("users-ima-okf-inbox-foo")
+    assert ip.GARBAGE_SLUG_RE.match("users-<user>-okf-inbox-foo")
     assert not ip.GARBAGE_SLUG_RE.match("okf-pipeline")
 
 

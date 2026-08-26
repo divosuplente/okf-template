@@ -1,4 +1,4 @@
-# ulife — Index
+# Life — Index
 
 Personal: key elements, goals, habits, projects, topics.
 

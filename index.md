@@ -1,7 +1,3 @@
----
-type: infrastructure
----
-
 # OKF Brain — Index
 
 Progressive-disclosure catalog for this Open Knowledge Format corpus. This vault is the sole source of truth. Agents start with `IDENTITY.md` → `CONTEXT.md`, then use this index to see what exists before opening individual concepts.

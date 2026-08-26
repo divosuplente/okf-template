@@ -1,4 +1,4 @@
-# uwork — Index
+# Work — Index
 
 Enterprise / internal notes (default private).
 

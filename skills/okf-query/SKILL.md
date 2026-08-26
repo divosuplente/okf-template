@@ -29,7 +29,7 @@ Read the top-ranked concept files to gather the full picture:
 
 ### Step 3: Answer
 - Answer the user's question using the concept content
-- **Cite exact concept files** used (e.g., "According to `concepts/learning/create-your-japanese-brain.md`...")
+- **Cite exact concept files** used (e.g., "According to `concepts/tools/example-concept.md`...")
 - If nothing supports the answer: say so plainly. Do not fabricate.
 - Distinguish between `private` and `shareable` — never expose private content in a shareable context
 
@@ -42,7 +42,7 @@ If the answer synthesizes multiple concepts into a new durable insight:
 5. Tell the user: "Filed this as a new concept: `concepts/learning/<slug>.md`"
 
 ## Search Tips
-- `okf search "japanese brain"` — full-text BM25 search
+- `okf search "agent orchestration"` — full-text BM25 search
 - `okf search "agents" --domain tools` — filter by domain
 - `okf search "private" --visibility shareable` — filter by visibility
 - `okf search "tool" --type tool` — filter by type

@@ -1,4 +1,4 @@
-# upeople — Index
+# People — Index
 
 Individuals — private contacts.
 

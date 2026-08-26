@@ -25,14 +25,14 @@ type: infrastructure
 | YouTube full channel | `skills/okf-ingest-channel/` + `stages/01`→`08` | Heavy pipeline |
 | Post-ingest cleanup only | `skills/okf-ingest/stages/03-cleanup/` | Slugs, fm, dedupe |
 | Index / lint / relink / doctor / view | `python3 tools/okf.py <cmd>` | After corpus changes |
-| Verify ICM integration | `python3 tools/okf.py icm-sync` + `doctor` | |
+| Verify ICM integration | `python3 tools/okf.py icm-sync` + `doctor` + `smoke_agent_surface.py` | See [okf-icm-workflow](concepts/tools/agents/orchestration/okf-icm-workflow.md) |
 | ICM routing sync | `python3 tools/okf.py icm-sync` | Optional skill: `okf-icm-sync` |
 | AAAK compress skills | `skills/okf-aaak-compression/` | Meta only |
 | Taxonomy / tags / domains | `_config/taxonomy.md` | Extensible; FBC mandatory |
 | Themes | `themes/index.md` | Overlay nav |
 | Specs | `specs/<id>/` | |
 | Path access | `rules/path-access-control.md` | |
-| Smoke check | `python3 tools/okf.py doctor` | |
+| Smoke check | `python3 tools/smoke_agent_surface.py` | |
 | Deep vault ops | `skills/okf-core/` | |
 
 ## Ingest vs journal
@@ -40,10 +40,24 @@ type: infrastructure
 - **Personal/therapy/journal** → **`okf-journal` only** (private life/*)
 
 ## Archived skills
-One-shot migration/audit/debug skills may live under `skills/_archive/` (not default routing).
+One-shot migration/audit/debug skills live under `skills/_archive/` (not default routing). See `skills/_archive/README.md`.
 
 ## Do not
 - Load every skill at session start  
 - Mark journal/therapy content `shareable`  
 - Renumber `concepts/` into pipeline folders  
-- Treat `raw/` as editable truth  
+- Treat `raw/` as editable truth
+
+## Auto-routed skills
+| Skill `analyze-sessions` | `skills/analyze-sessions/` | Auto-added by okf icm-sync; refine notes |
+| Skill `frontend-debug` | `skills/frontend-debug/` | Auto-added by okf icm-sync; refine notes |
+| Skill `okf-book-ingest` | `skills/okf-book-ingest/` | Auto-added by okf icm-sync; refine notes |
+| Skill `okf-problem-journal` | `skills/okf-problem-journal/` | Auto-added by okf icm-sync; refine notes |
+| Skill `okf-review` | `skills/okf-review/` | Auto-added by okf icm-sync; refine notes |
+| Skill `okf-study` | `skills/okf-study/` | Auto-added by okf icm-sync; refine notes |
+| Skill `okf-tasks` | `skills/okf-tasks/` | Auto-added by okf icm-sync; refine notes |
+| Skill `okf-teach` | `skills/okf-teach/` | Auto-added by okf icm-sync; refine notes |
+| Skill `snippets` | `skills/snippets/` | Auto-added by okf icm-sync; refine notes |
+| Skill `teach` | `skills/teach/` | Auto-added by okf icm-sync; refine notes |
+| Skill `visualize` | `skills/visualize/` | Auto-added by okf icm-sync; refine notes |
+

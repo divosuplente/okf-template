@@ -679,8 +679,7 @@ def build_slug_map(concepts):
 # Repo-root / non-concept path prefixes that must never be rewritten to concepts/.
 _ROOT_LINK_PREFIXES = (
     "/IDENTITY.md", "/CONTEXT.md", "/AGENTS.md", "/CLAUDE.md", "/GEMINI.md",
-    "/index.md", "/log.md", "/decisions.md", "/VAULT-IMPROVEMENTS.md",
-    "/_config/", "/rules/", "/skills/", "/tools/", "/themes/", "/specs/",
+    "/index.md", "/log.md", "/decisions.md",     "/_config/", "/rules/", "/skills/", "/tools/", "/themes/", "/specs/",
     "/raw/", "/provenance/", "/inbox/",
 )
 
@@ -702,16 +701,14 @@ def _is_protected_root_link(path: str) -> bool:
             name = p[1:]
             if name in {
                 "IDENTITY.md", "CONTEXT.md", "AGENTS.md", "CLAUDE.md", "GEMINI.md",
-                "index.md", "log.md", "decisions.md", "VAULT-IMPROVEMENTS.md",
-            }:
+                "index.md", "log.md", "decisions.md",             }:
                 return True
         return False
     # relative link to root file from a concept (../ or multi-up) ending at known root files
     base = p.rsplit("/", 1)[-1]
     if base in {
         "IDENTITY.md", "CONTEXT.md", "AGENTS.md", "CLAUDE.md", "GEMINI.md",
-        "index.md", "log.md", "decisions.md", "VAULT-IMPROVEMENTS.md",
-    }:
+        "index.md", "log.md", "decisions.md",     }:
         # only protect if not clearly under concepts/
         if "concepts/" not in p:
             return True

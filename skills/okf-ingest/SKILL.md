@@ -291,9 +291,9 @@ See `_config/taxonomy.md` (extensible reference). FBC still required.
 | Domain/Subdomain | Subsubdomains |
 |-----------------|---------------|
 | `learning/dev` | `javascript`, `react`, `css`, `typescript`, `vue`, `svelte`, `html`, `git`, `dotnet`, `api`, `performance`, `ai`, `architecture` |
-| `learning/health` | `fitness`, `nutrition` |
-| `learning/languages` | `japanese`, `korean`, `chinese`, `german`, `dutch` |
-| `learning/skills` | `journaling` |
+| `learning/health` | `general` |
+| `learning/languages` | `general` |
+| `learning/skills` | `general` |
 | `tools/dev` | `general`, `devices` |
 | `tools/general` | `devices`, `general`, `orchestration` |
 
@@ -319,7 +319,7 @@ See `_config/taxonomy.md` (extensible reference). FBC still required.
 
 `tools/ingest.py` has known limitations requiring a **mandatory post-ingest cleanup pass**:
 
-1. **Slug-from-path bug**: When `parse_source()` fails to extract a title, `slugify()` falls back to `source_ref` (file path), producing garbage slugs (`users-ima-okf-inbox-...`). Always verify and rename slugs post-ingest.
+1. **Slug-from-path bug**: When `parse_source()` fails to extract a title, `slugify()` falls back to `source_ref` (file path), producing garbage slugs (`users-<user>-okf-inbox-...`). Always verify and rename slugs post-ingest.
 2. **No subdomain support**: `ingest.py` only accepts `--domain`. Subdomain routing must be done post-ingest via file moves.
 3. **Title extraction may fail**: Obsidian clipping frontmatter produces mangled titles. Inspect all frontmatter after ingest.
 4. **Post-ingest cleanup is mandatory**: Rename garbage slugs → move to correct subdomain/subsubdomain paths → fix frontmatter → delete true duplicates (check existing file quality for merge).

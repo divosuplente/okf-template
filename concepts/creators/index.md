@@ -1,4 +1,4 @@
-# ucreators — Index
+# Creators — Index
 
 Public creators, channels, authors.
 

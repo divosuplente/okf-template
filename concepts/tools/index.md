@@ -1,5 +1,3 @@
-# utools — Index
+# Tools
 
-Products, CLIs, agent frameworks, devices.
-
-Concepts in this domain: `okf search --domain tools`
+- [Test Concept](/concepts/tools/test-concept.md) — A test concept for template verification

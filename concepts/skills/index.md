@@ -1,4 +1,4 @@
-# uskills — Index
+# Skills — Index
 
 Reusable expertise — knowledge about skills.
 

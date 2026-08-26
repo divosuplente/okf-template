@@ -42,7 +42,7 @@ If conflicts arise, abort (`git rebase --abort`) and tell the user what needs ma
 ## Repository layout
 - `concepts/<domain>/<slug>.md` — canonical OKF concept files. Domains: `life`, `people`, `orgs`, `documents`, `tools`, `specs`, `skills`, `learning`, `creators`, `work`.
 - `concepts/<domain>/<subdomain>/<slug>.md` — subdomain concepts (e.g., `learning/health`, `tools/agents`, `learning/skills`)
-- `concepts/<domain>/<subdomain>/<subsubdomain>/<slug>.md` — subsubdomain concepts (e.g., `learning/health/nutrition`, `learning/music/vocal-technique`, `learning/skills/journaling`)
+- `concepts/<domain>/<subdomain>/<subsubdomain>/<slug>.md` — subsubdomain concepts (e.g., `learning/health/nutrition`, `learning/music/theory`, `learning/skills/writing`)
 - `raw/` — verbatim snapshots of originally-ingested source files (historical archive; read-only, not authoritative, not re-read).
 - `provenance/map.json` (+ generated `provenance/map.md`) — concept → source mapping (historical; generated from frontmatter).
 - `index.md` — progressive-disclosure catalog. `log.md` — append-only history.

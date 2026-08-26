@@ -1,4 +1,4 @@
-# uspecs — Index
+# Specs — Index
 
 Specifications and standards.
 

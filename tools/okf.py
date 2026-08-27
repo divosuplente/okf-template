@@ -460,6 +460,8 @@ def cmd_view(args):
     url = viewer_url(port)
     print(f"OKF graph viewer: {url}")
     print("Press Ctrl+C to stop.")
+    print(f"Note: serving on loopback ({LOOPBACK}) only — not exposed to the network.",
+          file=sys.stderr)
     if not args.no_open:
         try:
             webbrowser.open(url)
@@ -831,8 +833,22 @@ def cmd_link(args):
         noise_targets = {"tools/cc-switch"}
         pairs = [(s, a, b, r) for s, a, b, r in pairs if a not in noise_targets and b not in noise_targets]
     else:
-        data = json.load(sys.stdin)
-        pairs = [(d["score"], d["a"], d["b"], d["reason"]) for d in data]
+        try:
+            data = json.load(sys.stdin)
+        except json.JSONDecodeError as e:
+            print(f"Error: invalid JSON on stdin: {e}", file=sys.stderr)
+            return 1
+        if not isinstance(data, list):
+            print(f"Error: expected a JSON array on stdin, got {type(data).__name__}", file=sys.stderr)
+            return 1
+        _LINK_KEYS = ("score", "a", "b", "reason")
+        pairs = []
+        for i, d in enumerate(data):
+            missing = [k for k in _LINK_KEYS if k not in d]
+            if missing:
+                print(f"Error: entry {i} missing required keys: {', '.join(missing)}", file=sys.stderr)
+                return 1
+            pairs.append((d["score"], d["a"], d["b"], d["reason"]))
     applied = 0
     skipped = 0
     for score, id_a, id_b, reason in pairs:
@@ -988,9 +1004,20 @@ def _atomic_cache_swap(temp_path: Path, target: Path):
             old.unlink(missing_ok=True)
 
 
+_FORBIDDEN_SQL_RE = re.compile(
+    r"\b(ATTACH|PRAGMA|CREATE|INSERT|UPDATE|DELETE|DROP|readfile|read_csv)\b",
+    re.IGNORECASE,
+)
+_MAX_QUERY_BYTES = 1_048_576  # 1 MB
+
+
 def _is_select(sql: str) -> bool:
-    """Check if SQL starts with SELECT (case-insensitive, leading whitespace)."""
-    return sql.lstrip().upper().startswith("SELECT")
+    """Check if SQL is a safe read-only SELECT query."""
+    if not sql.lstrip().upper().startswith("SELECT"):
+        return False
+    if _FORBIDDEN_SQL_RE.search(sql):
+        return False
+    return True
 
 
 def cmd_sql(args):
@@ -1008,6 +1035,11 @@ def cmd_sql(args):
 
     if not sql:
         print("Empty query.", file=sys.stderr)
+        sys.exit(1)
+
+    # Enforce query size limit
+    if len(sql.encode("utf-8", errors="replace")) > _MAX_QUERY_BYTES:
+        print(f"Query too large (limit {_MAX_QUERY_BYTES >> 20} MB).", file=sys.stderr)
         sys.exit(1)
 
     # Restrict to read-only queries
@@ -1097,7 +1129,7 @@ def cmd_doctor(args):
 
     agents = REPO_ROOT / "AGENTS.md"
     if agents.exists():
-        at = agents.read_text(encoding="utf-8")
+        at = agents.read_text(encoding="utf-8", errors="replace")
         n = at.count("# OKF Brain — Operating Contract")
         if n != 1:
             err("agents.dup", f"AGENTS.md Operating Contract heading count={n}, want 1")
@@ -1118,7 +1150,7 @@ def cmd_doctor(args):
             if (d / "SKILL.md").exists():
                 skill_names.append(d.name)
     ctx_path = REPO_ROOT / "CONTEXT.md"
-    ctx = ctx_path.read_text(encoding="utf-8") if ctx_path.exists() else ""
+    ctx = ctx_path.read_text(encoding="utf-8", errors="replace") if ctx_path.exists() else ""
     for name in skill_names:
         if name not in ctx and f"skills/{name}" not in ctx:
             warn("route.skill", f"skill {name} not mentioned in CONTEXT.md routing")
@@ -1129,9 +1161,9 @@ def cmd_doctor(args):
         sf = skills_dir / name / "SKILL.full.md"
         if not sm.exists():
             continue
-        sm_t = sm.read_text(encoding="utf-8")
+        sm_t = sm.read_text(encoding="utf-8", errors="replace")
         if sf.exists():
-            sf_t = sf.read_text(encoding="utf-8")
+            sf_t = sf.read_text(encoding="utf-8", errors="replace")
             def fm_field(t, key):
                 if not t.startswith("---"):
                     return None
@@ -1160,7 +1192,7 @@ def cmd_doctor(args):
     if skills_cx.exists():
         for path in skills_cx.rglob("*.md"):
             try:
-                t = path.read_text(encoding="utf-8")
+                t = path.read_text(encoding="utf-8", errors="replace")
             except Exception:
                 continue
             if "okf-ingest.md-channel" in t:
@@ -1207,7 +1239,7 @@ def cmd_icm_sync(args):
     if not ctx_path.exists():
         print("error: CONTEXT.md missing", file=sys.stderr)
         return 1
-    ctx = ctx_path.read_text(encoding="utf-8")
+    ctx = ctx_path.read_text(encoding="utf-8", errors="replace")
     missing = [s for s in skills if s not in ctx and f"skills/{s}" not in ctx]
     present = [s for s in skills if s in ctx or f"skills/{s}" in ctx]
     print(f"icm-sync: {len(skills)} skill(s); {len(present)} routed; {len(missing)} missing")
@@ -1233,7 +1265,16 @@ def cmd_icm_sync(args):
     else:
         ctx = ctx.rstrip() + "\n\n## Auto-routed skills\n" + block + "\n"
     if not args.dry_run:
-        ctx_path.write_text(ctx, encoding="utf-8")
+        # Atomic write: temp file + os.replace to avoid partial writes
+        fd, tmp = tempfile.mkstemp(suffix=".tmp", dir=str(ctx_path.parent))
+        try:
+            with os.fdopen(fd, "w", encoding="utf-8") as f:
+                f.write(ctx)
+            os.replace(tmp, str(ctx_path))
+        except Exception:
+            if os.path.exists(tmp):
+                os.unlink(tmp)
+            raise
         print(f"wrote {len(missing)} routing stub(s) into CONTEXT.md")
     return 0
 

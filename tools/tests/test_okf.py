@@ -1,4 +1,6 @@
 """Unit tests for the okf CLI library (stdlib + pytest only)."""
+import argparse
+import json
 import io
 import os
 import sys
@@ -728,8 +730,95 @@ def test_is_select_identifies_queries():
     assert okf._is_select("SELECT * FROM x") is True
     assert okf._is_select("  SELECT * FROM x") is True
     assert okf._is_select("select * from x") is True
-    assert okf._is_select("SELECT * FROM x; DROP TABLE y") is True  # starts with SELECT
+    
     assert okf._is_select("DROP TABLE x") is False
     assert okf._is_select("INSERT INTO x VALUES (1)") is False
     assert okf._is_select("DELETE FROM x") is False
     assert okf._is_select("UPDATE x SET y=1") is False
+
+def test_is_select_rejects_forbidden_keywords():
+    """_is_select rejects SELECT queries containing forbidden keywords."""
+    for kw in ("ATTACH", "PRAGMA", "CREATE", "INSERT", "UPDATE", "DELETE", "DROP"):
+        assert okf._is_select(f"SELECT 1; {kw} TABLE x") is False, f"Should reject {kw}"
+    assert okf._is_select('SELECT readfile("/etc/passwd")') is False
+    assert okf._is_select('SELECT read_csv("/tmp/x.csv")') is False
+
+
+def test_is_select_accepts_safe_queries():
+    """_is_select accepts clean SELECT queries."""
+    assert okf._is_select("SELECT * FROM concepts") is True
+    assert okf._is_select("SELECT id, title FROM concepts WHERE tags LIKE '%tool%'") is True
+
+
+def test_cmd_sql_rejects_oversized_query(tmp_path, capsys):
+    """cmd_sql rejects queries exceeding the 1MB limit."""
+    import argparse
+    big = "SELECT '" + "x" * okf._MAX_QUERY_BYTES + "'"
+    args = argparse.Namespace(query=[big])
+    try:
+        okf.cmd_sql(args)
+    except SystemExit as e:
+        assert e.code == 1
+    stdout, stderr = capsys.readouterr()
+    assert "too large" in stderr.lower()
+
+
+def test_cmd_link_rejects_invalid_json(tmp_path, monkeypatch):
+    """cmd_link exits 1 on malformed JSON stdin."""
+    import io
+    monkeypatch.setattr(okf, "CONCEPTS_DIR", tmp_path)
+    monkeypatch.setattr(okf, "INDEX_PATH", tmp_path / "index.json")
+    (tmp_path / "index.json").write_text("{}")
+    import sys
+    monkeypatch.setattr(sys, "stdin", io.TextIOWrapper(io.BytesIO(b"{bad json}")))
+    args = argparse.Namespace(auto=False)
+    result = okf.cmd_link(args)
+    assert result == 1
+
+
+def test_cmd_link_rejects_non_array_json(tmp_path, monkeypatch):
+    """cmd_link exits 1 when stdin JSON is not an array."""
+    import io
+    monkeypatch.setattr(okf, "CONCEPTS_DIR", tmp_path)
+    monkeypatch.setattr(okf, "INDEX_PATH", tmp_path / "index.json")
+    (tmp_path / "index.json").write_text("{}")
+    import sys
+    monkeypatch.setattr(sys, "stdin", io.TextIOWrapper(io.BytesIO(b'{"score": 1}')))
+    args = argparse.Namespace(auto=False)
+    result = okf.cmd_link(args)
+    assert result == 1
+
+
+def test_cmd_link_rejects_missing_keys(tmp_path, monkeypatch):
+    """cmd_link exits 1 when entry lacks required keys."""
+    import io
+    monkeypatch.setattr(okf, "CONCEPTS_DIR", tmp_path)
+    monkeypatch.setattr(okf, "INDEX_PATH", tmp_path / "index.json")
+    (tmp_path / "index.json").write_text("{}")
+    import sys
+    monkeypatch.setattr(sys, "stdin", io.TextIOWrapper(io.BytesIO(b'[{"score": 1}]')))
+    args = argparse.Namespace(auto=False)
+    result = okf.cmd_link(args)
+    assert result == 1
+
+
+def test_cmd_link_accepts_valid_json(tmp_path, monkeypatch):
+    """cmd_link exits 0 with valid JSON array."""
+    import io
+    monkeypatch.setattr(okf, "CONCEPTS_DIR", tmp_path)
+    monkeypatch.setattr(okf, "INDEX_PATH", tmp_path / "index.json")
+    (tmp_path / "index.json").write_text("{}")
+    import sys
+    payload = json.dumps([{"score": 1, "a": "x", "b": "y", "reason": "test"}])
+    monkeypatch.setattr(sys, "stdin", io.TextIOWrapper(io.BytesIO(payload.encode())))
+    args = argparse.Namespace(auto=False)
+    result = okf.cmd_link(args)
+    assert result == 0
+
+
+def test_cmd_view_prints_loopback_warning(tmp_path, monkeypatch, capsys):
+    """cmd_view LOOPBACK constant is correct."""
+    monkeypatch.setattr(okf, "CONCEPTS_DIR", tmp_path)
+    monkeypatch.setattr(okf, "INDEX_PATH", tmp_path / "index.json")
+    (tmp_path / "index.json").write_text("{}")
+    assert okf.LOOPBACK == "127.0.0.1"

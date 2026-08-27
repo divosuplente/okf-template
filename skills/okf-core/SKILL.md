@@ -20,7 +20,7 @@ description: "OKF core operations — base knowledge layer for the OKF brain vau
 
 
 ## What OKF Is
-A personal Open Knowledge Format brain at `<repo-root>`. It is the **single source of truth** — all knowledge lives here as plain markdown concept files.
+A personal Open Knowledge Format brain at `~/okf`. It is the **single source of truth** — all knowledge lives here as plain markdown concept files. No external origin folders (pka, toolswiki are deprecated).
 
 ## Repository Layout
 ```
@@ -85,11 +85,11 @@ When creating a new concept, determine its domain/subdomain/subsubdomain by **re
 **Decision flow:**
 1. Read the entire source document body.
 2. Based on the full content, determine:
-   - Is it personal (diary, therapy, personal topics)? → `life` + appropriate subdomain
-   - Is it a learning topic (health, language, code, music)? → `learning` + appropriate subdomain/subsubdomain
+   - Is it personal (neurodivergence, diary, travel, mindfulness)? → `life` + appropriate subdomain
+   - Is it a learning topic (recipe, exercise, language, code, music, keto, aromatherapy)? → `learning` + appropriate subdomain/subsubdomain
    - Is it a tool/app/device? → `tools` + appropriate subdomain/subsubdomain
    - Is it a private contact (doctor, therapist, tech)? → `people` + appropriate subdomain
-   - Is it work-related (enterprise/internal notes)? → `work` + appropriate subdomain
+   - Is it work-related (SharePoint, Azure)? → `work` + appropriate subdomain
    - Is it an agent skill? → `skills` + appropriate subdomain
    - Is it a public creator/figure? → `creators/general`
    - Is it an organization? → `orgs/general`
@@ -100,8 +100,8 @@ When creating a new concept, determine its domain/subdomain/subsubdomain by **re
 
 **Examples:**
 - A YouTube video about React hooks → full body discusses React → `learning/dev/react`
-- A personal therapy reflection → full body is personal journaling → `life/personal`
-- A health science article → full body discusses health → `learning/health`
+- A personal therapy reflection → full body is personal journaling → `life/neurodivergent`
+- A keto recipe article → full body is about cooking + keto → `learning/keto` (or `learning/cooking` if not specifically keto)
 - An AI coding agent tool → full body describes a tool → `tools/agents/coding-agents`
 
 ## Tag Cleanup During Ingest
@@ -127,6 +127,7 @@ After reading the full body and before writing the concept, audit tags:
 | `ai-skills` | `ai` | Redundant qualifier |
 | `agenticcoding` | `agentic-engineering` | Correct canonical form |
 | `blood-sugar` | `glucose` | Scientific term preferred |
+| `keto-recipes` | `keto` | Subsumed by domain sub + keto |
 | `progamming` | `programming` | Typo fix |
 | `selfhosting` | `self-hosted` | Hyphenated form |
 | `webdev` | `web-development` | Expanded form |
@@ -134,6 +135,8 @@ After reading the full body and before writing the concept, audit tags:
 | `long-covid` | `covid` | Shorter canonical |
 | `heart-health` | `cardiovascular` | Scientific term preferred |
 | `lowcarb` | `low-carb` | Hyphenated form |
+| `essential-oils` | `aromatherapy` | Domain-aligned |
+| `breathwork` | `breathing` | Canonical form |
 | `terminal-tools` | `terminal` | Shorter form |
 | `coding-agent` | `coding-agents` | Singular→plural convention |
 
@@ -144,7 +147,7 @@ After creating any new concept, add a backlink to its parent hub. The target hub
 | Concept depth | Backlink target | Example |
 |--------------|----------------|---------|
 | Subsubdomain concept (`<dom>/<sub>/<ssub>/<slug>.md`) | `concepts/<dom>/<sub>/<ssub>.md` | `learning/dev/react/my-hook.md` → backlink in `learning/dev/react.md` |
-| Subdomain concept (`<dom>/<sub>/<slug>.md`, no ssub) | `concepts/<dom>/<sub>.md` | `learning/dev/react/my-hook.md` → backlink in `learning/dev/react.md`; `creators/general/3b1b.md` → backlink in `creators/general.md` |
+| Subdomain concept (`<dom>/<sub>/<slug>.md`, no ssub) | `concepts/<dom>/<sub>.md` | `learning/keto/keto-flu.md` → backlink in `learning/keto.md`; `creators/general/3b1b.md` → backlink in `creators/general.md` |
 | *(No flat-domain concepts — every domain has subdomains)* | — | — |
 
 The domain hub auto-covers new concepts via its link to the subdomain hub — no update needed unless a new subdomain is created.
@@ -189,7 +192,7 @@ find "$VAULT/inbox/processed" -maxdepth 1 -type f -mtime +7 -delete
 
 `tools/ingest.py` has known limitations that require a **mandatory post-ingest cleanup pass**:
 
-1. **Slug-from-path bug**: When `parse_source()` fails to extract a title from the source, `slugify()` falls back to the `source_ref` (file path or URL), producing garbage slugs like `users-<user>-okf-inbox-...` or `inbox-...`. Always verify slugs after ingest and rename files to proper title-derived slugs.
+1. **Slug-from-path bug**: When `parse_source()` fails to extract a title from the source, `slugify()` falls back to the `source_ref` (file path or URL), producing garbage slugs like `users-ima-okf-inbox-...` or `inbox-...`. Always verify slugs after ingest and rename files to proper title-derived slugs.
 2. **No subdomain support**: `ingest.py` only accepts a top-level `--domain` flag. It writes all concepts to `concepts/<domain>/<slug>.md`. Subdomain routing (`concepts/<domain>/<sub>/<slug>.md`) must be done post-ingest via file moves.
 3. **Title extraction may fail**: For inbox files with Obsidian clipping frontmatter, the title often comes through mangled (emoji prefixes, triple-quoted strings, raw URLs as description). Always inspect frontmatter after ingest.
 4. **Post-ingest cleanup is mandatory**: After running `ingest.py`, you MUST:
@@ -219,3 +222,44 @@ find "$VAULT/inbox/processed" -maxdepth 1 -type f -mtime +7 -delete
 - `concepts/creators/` — public content creators (YouTube channels, authors, speakers)
 - `people/` entries are typically `visibility: private`
 - `creators/` entries are typically `visibility: shareable` (public figures)
+
+
+## Operational Procedures Taxonomy
+
+This section codifies how myPKA's SOP/Workstream/Guideline taxonomy maps into OKF's skill system. OKF has no separate "SOP" entity — **skills are the atomic procedures**, and higher-order orchestration is expressed through skill composition.
+
+### Mapping: myPKA → OKF
+
+| myPKA concept | OKF equivalent | Location | Notes |
+|---------------|---------------|----------|-------|
+| **SOP** (atomic procedure) | **Skill** | `skills/<okf-action-target>/SKILL.md` | Each OKF skill IS an atomic procedure: trigger conditions, ordered steps, acceptance criteria. The skill file replaces the SOP document. |
+| **Workstream** (multi-agent orchestration) | **Pipeline skill** | `skills/<okf-action-target>/SKILL.md` | A skill whose procedure sequences other skills. Example: `okf-batch-ingest` orchestrates `okf-ingest` calls. Pipeline skills compose; they don't duplicate sub-skill logic. |
+| **Guideline** (static reference rule) | **Config/convention files** + **inline rules** | `_config/taxonomy.md`, `_config/conventions.md`, `_config/glossary.md` | Static rules live in `_config/`. Skills `@reference` them (e.g. `@tax`), never duplicate. Per-skill rules stay inline in `SKILL.md`. |
+| **Session log** | **log.md** | `log.md` | Existing append-only history. No change. |
+| **Templates** | **Per-context templates inside skills** | `skills/okf-journal/` body template; per-skill `CONTEXT.md` | Templates live within the skill that owns the context, not in a shared template directory. |
+| **Task** | **okf-tasks** | `skills/okf-tasks/` (skill) + per-task files | New skill + directory for task lifecycle. |
+
+### Skill naming conventions
+
+Skill names follow the pattern **`okf-<action>-<target>`**:
+
+- `okf-ingest` — action: ingest, target: (generic content)
+- `okf-query` — action: query, target: (brain vault)
+- `okf-journal` — action: ingest, target: journal entries
+- `okf-batch-ingest` — action: batch-ingest, target: (multiple items) — *pipeline skill*
+- `okf-core` — action: (none — foundational), target: core operations — *reference skill*
+
+**Rules:**
+1. **Atomic skills** use `okf-<verb>-<noun>` or `okf-<compound-verb>` when the action is self-describing.
+2. **Pipeline skills** compose other skills in sequence — the name describes the orchestrated outcome (`okf-batch-ingest`, not `okf-ingest-batch`).
+3. **Config files hold static rules**; skills `@reference` them, never duplicate the rules inline. Deduplication is mandatory — if a rule exists in `_config/`, the skill links to it with a shorthand (e.g. `@tax` → `_config/taxonomy.md`), not a copy.
+4. **New SOPs become new skills** — create `skills/okf-<action>-<target>/SKILL.md` with frontmatter + trigger + steps + acceptance.
+5. **New workstreams become pipeline skills** — create a skill whose procedure names the sub-skills it calls, in order.
+6. **New guidelines extend `_config/`** — add rules to the appropriate config file; update `@tax`/`@conventions`/`@glossary` references.
+
+### What does NOT get a skill
+
+- **Pure data** → concept file under `concepts/`
+- **Static reference** → `_config/` entry or concept file
+- **One-off action with no repeatable procedure** → inline in the session, no skill
+- **Knowledge about a skill** (not the skill itself) → `concepts/skills/` directory

@@ -13,7 +13,7 @@ type: skill
 # OKF Core — Operating Model for the Brain Vault
 
 ## What OKF Is
-A personal Open Knowledge Format brain at `<repo-root>`. It is the **single source of truth** — all knowledge lives here as plain markdown concept files.
+A personal Open Knowledge Format brain at `~/okf`. It is the **single source of truth** — all knowledge lives here as plain markdown concept files. No external origin folders (pka, toolswiki are deprecated).
 
 ## Repository Layout
 ```

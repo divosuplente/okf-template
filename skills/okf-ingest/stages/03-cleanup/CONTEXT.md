@@ -18,7 +18,7 @@ python3 tools/ingest_postprocess.py --dry-run --paths <concept.md> …
 Strips noise tags / flags garbage slugs only — **never** classifies domain or semantic tags.
 
 ## Checklist
-1. **Slug** — Rename garbage path-derived slugs (`users-<user>-okf-inbox-…`) to title-derived kebab slugs.
+1. **Slug** — Rename garbage path-derived slugs (`users-ima-okf-inbox-…`) to title-derived kebab slugs.
 2. **Subdomain** — Move from flat `concepts/<dom>/` into correct `sub` / `ssub` (ingest CLI has no subdomain flag).
 3. **Frontmatter** — Fix mangled titles (emoji, raw URLs, triple quotes); set real `description`; tag audit.
 4. **Duplicates** — If concept already exists, merge into higher-quality file; delete true dupes.

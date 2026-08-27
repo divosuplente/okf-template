@@ -98,6 +98,6 @@ cd "$VAULT"
 git add -A
 TIMESTAMP=$(date +"%Y-%m-%d %H:%M:%S")
 git commit -m "inbox ingest: $SUCCESS ingested, $FAILED_COUNT failed — $TIMESTAMP" 2>&1 || true
-# git push origin main 2>&1 || echo "⚠️ Push failed"  # Remove or adapt for your git workflow
+git push origin main 2>&1 || echo "⚠️ Push failed"
 
 echo "Done. Success: $SUCCESS, Failed: $FAILED_COUNT"

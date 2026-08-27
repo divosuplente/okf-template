@@ -21,7 +21,7 @@ type: skill
 
 Shared reference (extensible, not a cage): `_config/taxonomy.md`.
 - Read **full** body/transcript — not title/keywords alone
-- `life` = personal topics only; cooking/health/fitness learning → `learning/…`
+- `life` = personal/neurodivergent/travel/mindfulness only; cooking/health learning → `learning/…`
 - Agent frameworks → `tools/agents/…`; devices → `tools/dev/devices` (or current devices path)
 - `#private` or personal content → `visibility: private`
 - Skip structural headings as titles: Transcript, Features, Installation, Readme, Overview, Introduction

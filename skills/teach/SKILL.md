@@ -148,7 +148,7 @@ The user will sometimes express preferences of how they want to be taught, or th
 
 ## OKF Vault Integration
 
-This copy of the teach skill runs inside the OKF brain at the repository root. The vault is the source of truth for durable knowledge; the teaching workspace is the engine that produces it. Follow these rules:
+This copy of the teach skill runs inside the OKF brain at `/Users/ima/okf`. The vault is the source of truth for durable knowledge; the teaching workspace is the engine that produces it. Follow these rules:
 
 ### Workspace location
 

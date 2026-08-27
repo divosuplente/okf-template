@@ -58,8 +58,8 @@ For each markdown file:
 
    | Domain | Content scope | Visibility default |
    |--------|--------------|-------------------|
-   | `life` | personal topics, journaling, personal goals | private |
-   | `learning` | Everything else: recipes, cooking, health, exercise, dev articles, languages, music | shareable |
+   | `life` | **ONLY** personal: neurodivergent, therapy, journaling, personal goals, travel, mindfulness | private |
+   | `learning` | Everything else: recipes, cooking, health, exercise, dev articles, languages, music, aromatherapy, keto | shareable |
    | `tools` | GitHub repos, apps, devices, software | shareable |
    | `skills` | AI-related content | shareable |
    | `specs` | AI-related specifications | shareable |
@@ -76,15 +76,15 @@ For each markdown file:
    ```
    VALID_SUBDOMAINS = {
        "creators": ["general"], "documents": ["general"], "specs": ["general"], "orgs": ["general"],
-       "people": ["general"], "skills": ["content", "general"],
-       "work": ["general"],
-       "life": ["personal"],
+       "people": ["medical", "tech", "general"], "skills": ["claude-code", "content", "general"],
+       "work": ["sharepoint", "azure", "general"],
+       "life": ["neurodivergent", "personal", "travel", "mindfulness"],
        "tools": ["agents", "dev", "general"],
-       "learning": ["dev", "languages", "music", "skills", "cooking", "health", "general"],
+       "learning": ["dev", "languages", "music", "skills", "keto", "cooking", "health", "sharepoint", "aromatherapy", "general"],
    VALID_SUBSUBS = {
        "learning": {"dev": ["javascript", "react", "css", "typescript", "vue", "svelte", "html", "git", "dotnet", "api", "performance", "ai", "architecture"],
-                    "health": ["general"],
-                    "skills": ["general"],
+                    "health": ["fitness", "nutrition"],
+                    "skills": ["journaling"],
        "tools": {"agents": ["orchestration", "coding-agents", "sandboxes", "memory", "mcp", "general"],
                  "dev": ["general", "devices"],
                  "general": ["devices", "general", "orchestration"]},
@@ -92,8 +92,8 @@ For each markdown file:
    ```
 
 5. **Critical domain routing changes** (vs. legacy):
-   - `cooking`, `health` → `learning/`, NOT `life/`
-   - `life/` is personal topics only
+   - `cooking`, `health`, `keto`, `aromatherapy` → `learning/`, NOT `life/`
+   - `life/` is **ONLY** neurodivergent, personal, travel, mindfulness
    - `tools/health` → distributed: devices stay in `tools/dev/devices/`, apps/content go to `learning/health/`
    - `tools/dev/coding-agents` → `tools/agents/coding-agents`
    - `tools/dev/orchestration` → `tools/agents/orchestration`
@@ -289,7 +289,7 @@ Fix any new lint regressions introduced by this batch (broken links to newly cre
 
 `tools/ingest.py` has known limitations requiring a **mandatory post-ingest cleanup pass**:
 
-1. **Slug-from-path bug**: When `parse_source()` fails to extract a title, `slugify()` falls back to `source_ref` (file path), producing garbage slugs (`users-<user>-okf-inbox-...`). Always verify and rename slugs post-ingest.
+1. **Slug-from-path bug**: When `parse_source()` fails to extract a title, `slugify()` falls back to `source_ref` (file path), producing garbage slugs (`users-ima-okf-inbox-...`). Always verify and rename slugs post-ingest.
 2. **No subdomain support**: `ingest.py` only accepts `--domain`. Subdomain routing must be done post-ingest via file moves.
 3. **Title extraction may fail**: Obsidian clipping frontmatter produces mangled titles. Inspect all frontmatter after ingest.
 4. **Post-ingest cleanup is mandatory**: Rename garbage slugs → move to correct subdomain/subsubdomain paths → fix frontmatter → delete true duplicates (check existing file quality for merge).

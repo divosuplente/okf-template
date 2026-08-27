@@ -1,5 +1,5 @@
 #!/usr/bin/env python3
-"""Dump user prompts from agent sessions for pattern mining."""
+"""Dump user prompts from OMP sessions for pattern mining."""
 import argparse
 import json
 import sys

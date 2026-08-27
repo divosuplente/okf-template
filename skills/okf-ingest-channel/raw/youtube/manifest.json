@@ -1,0 +1,28 @@
+{
+  "channel": "https://www.youtube.com/@Tenor_Simerilla/videos",
+  "fetched_at": "2026-08-22",
+  "since": null,
+  "total_videos": 3,
+  "transcripts_fetched": 0,
+  "skipped": 3,
+  "older_videos_count": 0,
+  "videos": [],
+  "skipped_videos": [
+    {
+      "id": "cJ7KD_-HgQg",
+      "title": "‼️What Are SOVT Exercises REALLY For? | Straw Phonation, Vocal Cord Closure & Head Voice",
+      "reason": "no subtitles available"
+    },
+    {
+      "id": "3To4_BbYPus",
+      "title": "Tenor Talk LIVE: Ft Long Long",
+      "reason": "no subtitles available"
+    },
+    {
+      "id": "f6Bp_Gto0H4",
+      "title": "🚪 The Door Analogy That Will INSTANTLY Explain Vocal Cord Adduction‼️",
+      "reason": "no subtitles available"
+    }
+  ],
+  "older_videos": []
+}

@@ -27,13 +27,13 @@ Uses yt-dlp for both channel enumeration and subtitle download. Free, no API key
 
 This skill has two execution paths depending on your agent's capabilities:
 
-### Path A: Eval-kernel agents
+### Path A: OMP/eval-kernel agents
 Use `completion()` + `parallel()` for extraction and page writing as described in Phases 2-4 below. Fastest: ~5 min for 14 videos.
 
 ### Path B: Universal agents (read/write/bash/delegate only)
 If your agent lacks `completion()` or `parallel()`:
 
-| Phase | Eval-kernel Path | Universal Path |
+| Phase | OMP Path | Universal Path |
 |-------|----------|----------------|
 | 2 Extract | `completion()` + `parallel()` | Delegate to task subagents: one per video (or 2-3 videos per subagent). Give each subagent the extraction JSON schema and prompt inline. Subagents write their `raw/youtube/extractions/<slug>.json` directly. |
 | 3 Canonicalize | `completion()` semantic dedup | Read all extraction JSONs yourself. Group by name similarity. For ambiguous cases, use your judgment or ask the user. Apply ≥2-video threshold manually. |
@@ -186,8 +186,8 @@ After writing ALL pages:
 #### Domain Routing Rules
 
 Classification based on content, not keywords:
-- **`life`** = personal topics only
-- **`learning`** = cooking, health, dev, languages, music, and general knowledge
+- **`life`** = ONLY neurodivergent, personal, travel, mindfulness
+- **`learning`** = cooking, health, keto, aromatherapy, dev, languages, music, sharepoint, and general knowledge
 - **`tools`** = agents, dev, general. NO `tools/health`. Health devices → `tools/dev/devices/`
 - Routing: `tools/dev/coding-agents` → `tools/agents/coding-agents`; `tools/dev/orchestration` → `tools/agents/orchestration`
 Valid subdomains:
@@ -196,18 +196,18 @@ Valid subdomains:
 - `specs`: [general]
 - `orgs`: [general]
 - `people`: [medical, tech, general]
-- `skills`: [content, general]
-- `work`: [general]
-- `life`: [personal]
+- `skills`: [claude-code, content, general]
+- `work`: [sharepoint, azure, general]
+- `life`: [neurodivergent, personal, travel, mindfulness]
 - `tools`: [agents, dev, general]
-- `learning`: [dev, languages, music, health, skills, general]
+- `learning`: [dev, languages, music, skills, keto, cooking, health, sharepoint, aromatherapy, general]
 
 Valid subsubdomains:
 - `learning/dev`: [javascript, react, css, typescript, vue, svelte, html, git, dotnet, api, performance, ai, architecture]
-- `learning/health`: [general]
-- `learning/languages`: [general]
-- `learning/music`: [general]
-- `learning/skills`: [general]
+- `learning/health`: [fitness, nutrition]
+- `learning/languages`: [japanese, korean, chinese, german, dutch]
+- `learning/music`: [vocal-technique]
+- `learning/skills`: [journaling]
 - `tools/agents`: [orchestration, coding-agents, sandboxes, memory, mcp, general]
 - `tools/dev`: [general, devices]
 - `tools/general`: [devices, general, orchestration]
@@ -316,7 +316,7 @@ concepts/creators/           # Creator concept page (channel bio + video links)
 
 `tools/ingest.py` has known limitations requiring a **mandatory post-ingest cleanup pass**:
 
-1. **Slug-from-path bug**: When `parse_source()` fails to extract a title, `slugify()` falls back to `source_ref` (file path), producing garbage slugs (`users-<user>-okf-inbox-...`). Always verify and rename slugs post-ingest.
+1. **Slug-from-path bug**: When `parse_source()` fails to extract a title, `slugify()` falls back to `source_ref` (file path), producing garbage slugs (`users-ima-okf-inbox-...`). Always verify and rename slugs post-ingest.
 2. **No subdomain support**: `ingest.py` only accepts `--domain`. Subdomain routing must be done post-ingest via file moves.
 3. **Title extraction may fail**: Obsidian clipping frontmatter produces mangled titles. Inspect all frontmatter after ingest.
 4. **Post-ingest cleanup is mandatory**: Rename garbage slugs → move to correct subdomain/subsubdomain paths → fix frontmatter → delete true duplicates (check existing file quality for merge).

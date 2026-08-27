@@ -25,8 +25,8 @@ def test_parse_frontmatter_scalars_inline_and_block_lists():
         'title: "Nub"',
         "tags: [nodejs, runtime]",
         "source:",
-        "  - origin:ecosystem/nub.md",
-        "  - origin:PKM/Topics/ai-tooling.md",
+        "  - toolswiki:ecosystem/nub.md",
+        "  - pka:PKM/My Life/Topics/ai-tooling.md",
         "# a comment line",
         "timestamp: 2026-06-30T00:00:00Z",
     ])
@@ -36,8 +36,8 @@ def test_parse_frontmatter_scalars_inline_and_block_lists():
     assert fm["title"] == "Nub"
     assert fm["tags"] == ["nodejs", "runtime"]
     assert fm["source"] == [
-        "origin:ecosystem/nub.md",
-        "origin:PKM/Topics/ai-tooling.md",
+        "toolswiki:ecosystem/nub.md",
+        "pka:PKM/My Life/Topics/ai-tooling.md",
     ]
     assert fm["timestamp"] == "2026-06-30T00:00:00Z"
 
@@ -157,11 +157,11 @@ def test_lint_broken_link_and_orphan():
 
 def test_lint_no_privacy_warning_for_nonpersonal_domain_shareable():
     """D-015: a shareable concept in a non-personal domain should NOT be flagged,
-    even with historical origin: sources."""
+    even with historical pka: sources."""
     concepts = [
         make_concept("tools/leak", {
             "type": "tool", "visibility": "shareable", "domain": "tools",
-            "source": ["origin:PKM/Topics/secret.md"],
+            "source": ["pka:PKM/My Life/Topics/secret.md"],
         }, "should not be flagged"),
     ]
     findings = okf.lint_concepts(concepts)
@@ -217,7 +217,7 @@ def test_view_parser_defaults():
 
 def test_resolve_to_concept_unique_and_skips():
     sm = {"rtk": ["tools/rtk"]}
-    assert okf.resolve_to_concept("../ecosystem/rtk.md", "tools/sample-tool", sm) == "tools/rtk"
+    assert okf.resolve_to_concept("../ecosystem/rtk.md", "tools/claude-code", sm) == "tools/rtk"
     assert okf.resolve_to_concept("rtk.md", "tools/x", sm) == "tools/rtk"
     assert okf.resolve_to_concept("https://rtk.ai/", "tools/x", sm) is None
     assert okf.resolve_to_concept("/concepts/tools/rtk.md", "tools/x", sm) is None  # already canonical
@@ -236,7 +236,7 @@ def test_rewrite_links():
     sm = {"rtk": ["tools/rtk"], "prompting-101": ["learning/prompting-101"]}
     text = ("See [RTK](../ecosystem/rtk.md) and [P](../learning/prompting-101.md#step-2) "
             "and [ext](https://x.com) and [self](rtk.md).")
-    new, n = okf.rewrite_links(text, "tools/sample-tool", sm)
+    new, n = okf.rewrite_links(text, "tools/claude-code", sm)
     assert "[RTK](/concepts/tools/rtk.md)" in new
     assert "[P](/concepts/learning/prompting-101.md#step-2)" in new  # fragment preserved
     assert "[ext](https://x.com)" in new  # external untouched
@@ -730,7 +730,6 @@ def test_is_select_identifies_queries():
     assert okf._is_select("SELECT * FROM x") is True
     assert okf._is_select("  SELECT * FROM x") is True
     assert okf._is_select("select * from x") is True
-    
     assert okf._is_select("DROP TABLE x") is False
     assert okf._is_select("INSERT INTO x VALUES (1)") is False
     assert okf._is_select("DELETE FROM x") is False
@@ -822,3 +821,4 @@ def test_cmd_view_prints_loopback_warning(tmp_path, monkeypatch, capsys):
     monkeypatch.setattr(okf, "INDEX_PATH", tmp_path / "index.json")
     (tmp_path / "index.json").write_text("{}")
     assert okf.LOOPBACK == "127.0.0.1"
+

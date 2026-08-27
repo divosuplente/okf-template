@@ -1,5 +1,5 @@
 #!/usr/bin/env python3
-"""Render an agent session as readable markdown."""
+"""Render an OMP session as readable markdown."""
 import argparse
 import sys
 from datetime import datetime, timezone
@@ -63,7 +63,7 @@ def render_session(sess: dict, include_subagents: bool = False, max_text: int = 
 
 
 def main():
-    parser = argparse.ArgumentParser(description="Show an agent session as markdown")
+    parser = argparse.ArgumentParser(description="Show an OMP session as markdown")
     parser.add_argument("--latest", action="store_true", help="Show most recent session")
     parser.add_argument("--session", help="Session id prefix (8 chars)")
     parser.add_argument("--since", help="Only sessions since")

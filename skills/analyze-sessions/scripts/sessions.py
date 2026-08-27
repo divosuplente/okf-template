@@ -3,11 +3,11 @@ import json
 from datetime import datetime, timedelta, timezone
 from pathlib import Path
 
-SESSIONS_DIR = Path(__file__).resolve().parent / ".." / ".." / ".." / ".." / ".agent" / "sessions"
+SESSIONS_DIR = Path(__file__).resolve().parent / ".." / ".." / ".." / ".." / ".omp" / "agent" / "sessions"
 SESSIONS_DIR = SESSIONS_DIR.resolve()
 # Fallback: use absolute path if relative doesn't resolve
 if not SESSIONS_DIR.exists():
-    SESSIONS_DIR = Path.home() / ".agent" / "sessions"
+    SESSIONS_DIR = Path("/Users/ima/.omp/agent/sessions")
 
 
 def parse_relative_time(when: str) -> datetime:

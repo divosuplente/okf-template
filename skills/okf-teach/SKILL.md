@@ -14,7 +14,7 @@ description: |
 ## Workspace Structure
 `teaching/`
 - `LEARNING-PREFERENCES.md` — Universal user preferences (visual-first, dark mode, low bandwidth, real sources, frequency-driven).
-- `<topic>/` (e.g., `javascript/`, `python/`, `general/`)
+- `<topic>/` (e.g., `dutch/`, `japanese/`, `javascript/`)
   - `_MISSION.md`, `_NOTES.md`, `_RESOURCES.md`, `_GLOSSARY.md` — Topic context (prefixed `_` so Astro ignores them; still directly accessible as files).
   - `lessons/` — MDX lesson files (`0001-name.md`).
   - `reference/` — Cheat sheets, conjugation tables, glossaries.
@@ -27,21 +27,21 @@ The teaching site has two interactive features built in:
 ### Inline Comments
 - **Select text** on any lesson page → a 💬 Comment tooltip appears
 - **📝 Note** — personal observation (stored, not actionable)
-- **🔧 Fix** — AI automatically fixes the lesson file (creates GitHub Issue → your agent applies fix → closes issue)
-- Comments stored as GitHub Issues in `<your-github-org>/2ndBrain` with labels `comment` + `note`/`fix`
+- **🔧 Fix** — AI automatically fixes the lesson file (creates GitHub Issue → goose applies fix → closes issue)
+- Comments stored as GitHub Issues in `INDigitalStudio/okf` with labels `comment` + `note`/`fix`
 - Page-level comments also available via "Comment on this page" button
 
 ### AI Chat Assistant
 - **💬 Floating icon** (bottom-right) → expandable chat panel
 - **📚 Lesson scope** (default): AI knows current lesson content
 - **📖 Course scope**: AI also sees topic mission + notes
-- Real-time SSE streaming via your agent
+- Real-time SSE streaming via goose
 - Context-aware: automatically includes the current lesson as system context
 
 ### Fixing Lessons from Comments
 When a `fix` comment is submitted:
 1. GitHub Issue created immediately
-2. Your agent runs asynchronously: reads lesson → applies fix → comments on issue → closes it
+2. Goose runs asynchronously: reads lesson → applies fix → comments on issue → closes it
 3. If fix fails, error is posted as an issue comment
 
 See `teaching/site/TEACHING-FEATURES.md` for full architecture and file map.
@@ -83,7 +83,7 @@ Write a learning record to `_records/<topic>/` capturing the retrospective's key
 
 ## Lesson Creation Process
 1. **Calibrate:** Check `_records/<topic>/` & `_NOTES.md` for zone of proximal development.
-2. **Draft Lesson:** Create `<topic>/lessons/<NN>-name.md` (e.g., `javascript/lessons/0001-variables.md`).
+2. **Draft Lesson:** Create `<topic>/lessons/<NN>-name.md` (e.g., `dutch/lessons/0001-greetings.md`).
    - Frontmatter: `title`, `description`, `level` (e.g., "A0"), `duration` (e.g., "5 min"), `weight` (ordering number).
    - Focus on ONE tightly-scoped concept tied to the mission.
    - Include visual rules, real examples, memory tricks, and a micro-challenge.

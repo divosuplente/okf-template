@@ -1,5 +1,5 @@
 #!/usr/bin/env python3
-"""Cost rollups for agent sessions."""
+"""Cost rollups for OMP sessions."""
 import argparse
 from datetime import datetime, timezone
 
@@ -7,7 +7,7 @@ from sessions import find_session_files, filter_sessions
 
 
 def main():
-    parser = argparse.ArgumentParser(description="Cost rollups for agent sessions")
+    parser = argparse.ArgumentParser(description="Cost rollups for OMP sessions")
     parser.add_argument("--since", help="Only sessions since (e.g. 7d)")
     parser.add_argument("--until", help="Only sessions until")
     parser.add_argument("--cwd", help="Filter by session cwd")

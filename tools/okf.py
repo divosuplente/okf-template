@@ -176,7 +176,7 @@ def extract_links(body: str, source_id: str):
             except ValueError:
                 continue
         # Only collapse known bad mid-path doubles (e.g. tools/agents/agents/foo).
-        # Do NOT collapse domain hubs (tools/tools) or leaf hubs (learning/topic/topic).
+        # Do NOT collapse domain hubs (tools/tools) or leaf hubs (learning/keto/keto).
         if "/agents/agents/" in cid:
             alt = cid.replace("/agents/agents/", "/agents/")
             cid = alt
@@ -253,7 +253,7 @@ def write_provenance(concepts):
          "re-run the indexer."),
         "",
         ("Each row maps a concept to its source(s). Source refs may be historical "
-         "origin paths (e.g. `origin-1:`, `origin-2:`), URLs (`https://...`), or `self:` for "
+         "origin paths (`pka:`, `toolswiki:`), URLs (`https://...`), or `self:` for "
          "vault-synthesized content. Historical snapshots live under `raw/`."),
         "",
         "## Concepts",
@@ -681,7 +681,8 @@ def build_slug_map(concepts):
 # Repo-root / non-concept path prefixes that must never be rewritten to concepts/.
 _ROOT_LINK_PREFIXES = (
     "/IDENTITY.md", "/CONTEXT.md", "/AGENTS.md", "/CLAUDE.md", "/GEMINI.md",
-    "/index.md", "/log.md", "/decisions.md",     "/_config/", "/rules/", "/skills/", "/tools/", "/themes/", "/specs/",
+    "/index.md", "/log.md", "/decisions.md", "/VAULT-IMPROVEMENTS.md",
+    "/_config/", "/rules/", "/skills/", "/tools/", "/themes/", "/specs/",
     "/raw/", "/provenance/", "/inbox/",
 )
 
@@ -703,14 +704,16 @@ def _is_protected_root_link(path: str) -> bool:
             name = p[1:]
             if name in {
                 "IDENTITY.md", "CONTEXT.md", "AGENTS.md", "CLAUDE.md", "GEMINI.md",
-                "index.md", "log.md", "decisions.md",             }:
+                "index.md", "log.md", "decisions.md", "VAULT-IMPROVEMENTS.md",
+            }:
                 return True
         return False
     # relative link to root file from a concept (../ or multi-up) ending at known root files
     base = p.rsplit("/", 1)[-1]
     if base in {
         "IDENTITY.md", "CONTEXT.md", "AGENTS.md", "CLAUDE.md", "GEMINI.md",
-        "index.md", "log.md", "decisions.md",     }:
+        "index.md", "log.md", "decisions.md", "VAULT-IMPROVEMENTS.md",
+    }:
         # only protect if not clearly under concepts/
         if "concepts/" not in p:
             return True

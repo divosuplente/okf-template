@@ -1,12 +1,12 @@
 ---
 type: skill
 name: analyze-sessions
-description: "Analyze past agent sessions: search transcripts, render sessions as markdown, mine prompting patterns, and roll up costs. Use when the user wants to find a past session, review what was done, surface recurring patterns, or understand token/cost spend."
+description: "Analyze past OMP agent sessions: search transcripts, render sessions as markdown, mine prompting patterns, and roll up costs. Use when the user wants to find a past session, review what was done, surface recurring patterns, or understand token/cost spend."
 ---
 
 # Analyze Sessions
 
-Tools for querying past agent sessions. All scripts are stdlib Python 3, no dependencies. Sessions live at `~/.agent/sessions/<project>/` (or your harness session dir).
+Tools for querying past OMP sessions. All scripts are stdlib Python 3, no dependencies. Sessions live at `~/.omp/agent/sessions/<project>/`.
 
 ## Data shape
 
@@ -18,7 +18,7 @@ Each session is a JSONL file. Records are:
 All scripts in `skills/analyze-sessions/scripts/`. Run from anywhere:
 
 ```bash
-python3 skills/analyze-sessions/scripts/<script>.py [args]
+python3 ~/.omp/agent/skills/analyze-sessions/scripts/<script>.py [args]
 ```
 
 ### `cost.py` — cost rollups
@@ -48,7 +48,7 @@ python3 search.py "session kickoff"
 python3 search.py "how to" --in user --since 30d
 python3 search.py --regex "TODO\(.+\)"
 python3 search.py "auth error" --context 2
-python3 search.py "deploy" --cwd <repo-root>
+python3 search.py "deploy" --cwd /Users/ima/okf
 ```
 
 ### `show_session.py` — render one session as markdown
@@ -56,7 +56,7 @@ python3 search.py "deploy" --cwd <repo-root>
 ```bash
 python3 show_session.py --latest
 python3 show_session.py --session 01a0378d
-python3 show_session.py --latest --cwd <repo-root>
+python3 show_session.py --latest --cwd /Users/ima/okf
 python3 show_session.py --session 01a0378d --include-subagents
 ```
 
@@ -65,7 +65,7 @@ python3 show_session.py --session 01a0378d --include-subagents
 ```bash
 python3 prompts.py --since 30d
 python3 prompts.py --since 7d --max-chars 1500 --format jsonl
-python3 prompts.py --cwd <repo-root> --since 30d
+python3 prompts.py --cwd /Users/ima/okf --since 30d
 python3 prompts.py --grep "rate limit" --since 60d
 ```
 

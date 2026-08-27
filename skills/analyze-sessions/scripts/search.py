@@ -1,5 +1,5 @@
 #!/usr/bin/env python3
-"""Search across agent session transcripts."""
+"""Search across OMP session transcripts."""
 import argparse
 import re
 import sys
@@ -8,7 +8,7 @@ from sessions import find_session_files, filter_sessions, load_session
 
 
 def main():
-    parser = argparse.ArgumentParser(description="Search agent session transcripts")
+    parser = argparse.ArgumentParser(description="Search OMP session transcripts")
     parser.add_argument("query", help="Search query (substring or regex)")
     parser.add_argument("--regex", action="store_true", help="Treat query as regex")
     parser.add_argument("--in", dest="role", choices=["user", "assistant", "all"], default="all", help="Filter by message role")

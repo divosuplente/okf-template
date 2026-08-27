@@ -332,7 +332,7 @@ def make_concept(
         ref = source_ref.strip()
         # strip scheme-like prefixes self: url:
         if ":" in ref and not ref.startswith("http"):
-            # self:some-file.md or origin:path
+            # self:some-file.md or toolswiki:path
             ref = ref.split(":", 1)[-1]
         elif ref.startswith("http://") or ref.startswith("https://"):
             ref = urllib.parse.urlparse(ref).path

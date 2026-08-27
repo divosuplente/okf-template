@@ -4,7 +4,7 @@ description: >-
   Journal entry and therapy/session note ingestion into the OKF brain. Triggered
   when user mentions journaling, therapy notes, therapy session, journal entry,
   personal reflection, or sensitive personal content to save. ALWAYS visibility:
-  private. Domain life (usually life/personal).
+  private. Domain life (usually life/personal or life/neurodivergent via FBC).
   Never shareable export.
 type: infrastructure
 ---
@@ -18,7 +18,7 @@ type: infrastructure
 ## Non-negotiable rules
 - **ALWAYS** `visibility: private`
 - **ALWAYS** personal-domain placement under `life/` (never `shareable`)
-- **FBC:** read full entry body to choose subdomain and tags — see `_config/taxonomy.md` (extensible)
+- **FBC:** read full entry body to choose subdomain (`personal`, `neurodivergent`, `mindfulness`, `travel`, …) and tags — see `_config/taxonomy.md` (extensible)
 - **NEVER** mark journal entries `shareable` or include them in exports
 - Prefer `skills/okf-journal` over generic ingest for this content (ingest defaults are often shareable)
 
@@ -36,7 +36,7 @@ type: infrastructure
 
 Examples:
 - `concepts/life/personal/journal-2026-08-06-weekly-reflection.md`
-- `concepts/life/personal/journal-2026-08-06-therapy-session.md`
+- `concepts/life/neurodivergent/journal-2026-08-06-therapy-session.md`
 
 ## Frontmatter template
 ```yaml
@@ -79,9 +79,9 @@ source:
 ```
 
 ## Cross-link targets (resolve current paths)
-Search first (`okf search`); paths may live under `life/personal/` after subdomain migration:
-- therapy, recovery, journaling-therapy, urge-surfing, and related personal health topics as applicable
-- Always depth-conditional backlink to parent hub (`life/personal`, …)
+Search first (`okf search`); paths may live under `life/neurodivergent/` after subdomain migration:
+- therapy, binge-eating recovery, journaling-binge-eating-therapy, urge-surfing, ADHD/autism notes as applicable
+- Always depth-conditional backlink to parent hub (`life/personal`, `life/neurodivergent`, …)
 
 ## Pipeline after write
 ```bash

@@ -6,7 +6,7 @@ description: Quick behavioral snippets activated via /snippet commands. Injects 
 
 # Snippets
 
-Quick behavioral contracts injected into the system prompt. Data lives in `${AGENT_DATA_DIR:-$HOME/.agent/data}/snippets.json`.
+Quick behavioral contracts injected into the system prompt via the `before_agent_start` extension hook. Data lives in `~/.omp/agent/snippets.json`.
 
 ## Commands
 
@@ -34,7 +34,7 @@ Quick behavioral contracts injected into the system prompt. Data lives in `${AGE
 ## How It Works
 
 1. User runs `/snippet verify` → extension adds to `activeSnippets`.
-2. Before every agent turn, the snippet hook prepends active snippet bodies to the system prompt.
+2. Before every agent turn, `before_agent_start` hook prepends active snippet bodies to the system prompt.
 3. Agent follows the behavioral contract automatically every turn.
 4. User runs `/snippet off` → clears active snippets, injection stops.
 
@@ -43,7 +43,7 @@ Multiple snippets stack: `/snippet verify diagnose` → both injected every turn
 ## Adding Snippets
 
 When user adds a snippet:
-1. Update `${AGENT_DATA_DIR:-$HOME/.agent/data}/snippets.json` with the new entry.
+1. Update `~/.omp/agent/snippets.json` with the new entry.
 2. Confirm and show it in the list format.
 
 JSON format:

@@ -12,7 +12,7 @@
 # Run this script FIRST, then ask the agent to "apply AAAK compression to skills/".
 #
 # Prerequisites:
-# - The agent-skill-compression managed skill must be available (it's in ${AGENT_SKILLS_DIR:-$HOME/.agent/skills}/)
+# - The agent-skill-compression managed skill must be available (it's in ~/.omp/agent/managed-skills/)
 # - The agent session must have access to the project's AGENTS.md
 
 set -euo pipefail
@@ -96,4 +96,4 @@ echo "  1. Ask the agent: 'apply AAAK compression to $SKILLS_DIR'"
 echo "  2. The agent will read each SKILL.full.md and write compressed SKILL.md"
 echo "  3. Verify: frontmatter matches, YAML blocks valid, semantic content preserved"
 echo ""
-echo "Managed skill location: ${AGENT_SKILLS_DIR:-$HOME/.agent/skills}/agent-skill-compression/SKILL.md"
+echo "Managed skill location: ~/.omp/agent/managed-skills/agent-skill-compression/SKILL.md"

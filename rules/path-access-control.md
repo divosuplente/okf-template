@@ -18,6 +18,7 @@ Define which paths agents may access by default, and which require explicit user
 - `specs/` – feature specs
 - `books/` – per-chapter book slices + formula snapshots (committed reference material; originals stay outside the repo)
 - `rules/` – agent path/policy rules (this file)
+- `.omp/` – project-local OMP extensions for hooks and guards
 - `IDENTITY.md`, `CONTEXT.md`, `AGENTS.md`, `decisions.md` – orientation + contract + decisions
 - `log.md` – vault change log
 - `index.md` – vault catalog (prefer `okf.py index` to regenerate; hand-edits will be overwritten)

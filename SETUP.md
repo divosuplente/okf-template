@@ -173,3 +173,81 @@ For the physics and math self-study roadmaps. Installed in §2 alongside the boo
 | `plotly` | Interactive browser plots — 3D surfaces, phase portraits | Physics 6, Math 11–14 |
 | `jupyter` + `notebook` + `ipykernel` | Interactive notebooks for lesson code | All levels |
 | `symderive` | Agent-native symbolic math — pipe-based API wrapping SymPy/PySR/CVXPY, designed for composable agent workflows | All levels |
+
+
+## 9. Agent hooks (OMP extensions)
+
+OMP supports **project-local extensions** — small `.js` files that hook into
+agent lifecycle events (`session_start`, `tool_call`, `session_stop`). They run
+on every session and can block tool calls, run pre-flight checks, or execute
+background work.
+
+### Two-layer architecture
+
+| Layer | Path | Scope |
+|---|---|---|
+| **Global loader** | `~/.omp/agent/extensions/project-loader.ts` | Discovers & loads local extensions |
+| **Local extensions** | `.omp/extensions/*.js` | Project-specific hooks (shipped with repo) |
+
+### Setup
+
+1. **Install the global loader** (one-time, NOT shipped by OMP):
+   Place `project-loader.ts` in `~/.omp/agent/extensions/`. It reads `.omp/extensions/*.js`
+   from the current project on every `session_start` and invokes them.
+
+```ts
+import type { ExtensionAPI } from "@oh-my-pi/pi-coding-agent";
+import * as fs from "fs";
+import * as path from "path";
+
+export default function (pi: ExtensionAPI): void {
+  pi.on("session_start", async (_event, ctx) => {
+    const localDir = path.join(ctx.cwd, ".omp", "extensions");
+    if (!fs.existsSync(localDir)) return;
+
+    const files = fs.readdirSync(localDir).filter(f => f.endsWith(".js"));
+    if (files.length === 0) return;
+
+    for (const file of files) {
+      try {
+        const mod = await import(path.join(localDir, file));
+        if (typeof mod.default === "function") mod.default(pi);
+        if (typeof mod.onSessionStart === "function") await mod.onSessionStart(_event, ctx);
+      } catch (e: unknown) {
+        const msg = e instanceof Error ? e.message : String(e);
+        console.warn(`Project extension ${file} failed to load: ${msg}`);
+      }
+    }
+  });
+}
+```
+
+2. **Write local extensions** in `.omp/extensions/`. Drop a `.js` file there;
+   it auto-loads on the next session. No config needed.
+
+### Extension contract
+
+Each extension is a CommonJS/ESM module with a default export:
+
+```js
+export default function (pi) {
+  pi.on("tool_call", async (event, ctx) => {
+    // event: { toolName, input }
+    // ctx: { cwd }
+    // Return { block: true, reason: "..." } to veto the tool call
+  });
+
+  pi.on("session_start", async (_event, ctx) => {
+    // Runs once at session boot; ctx.cwd = repo root
+  });
+}
+```
+
+### Common patterns
+
+- **Pre-flight guards**: validate frontmatter or schema before `write`/`edit`
+- **Path guards**: enforce allow/deny lists parsed from `rules/*.md`
+- **Auto-sync**: run `git pull --rebase` on first tool call
+
+This is OMP-specific. Other harnesses (Claude Code, Cursor, Codex) have
+different extension mechanisms — check their documentation for equivalents.

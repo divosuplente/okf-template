@@ -27,6 +27,9 @@ tools/sql_cache.duckdb-shm
 # Docling extraction artifacts (regenerable)
 .book_to_skill/
 
+.omp/git-sync-status.txt
+.omp/mcp.json
+
 # Obsidian editor state
 .obsidian/workspace.json
 .obsidian/workspace-mobile.json

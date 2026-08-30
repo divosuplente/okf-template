@@ -186,44 +186,22 @@ background work.
 
 | Layer | Path | Scope |
 |---|---|---|
+| **Bootstrap** | `.omp/setup.sh` + `.omp/bootstrap/` | One-shot install script + bundled files |
 | **Global loader** | `~/.omp/agent/extensions/project-loader.ts` | Discovers & loads local extensions |
 | **Local extensions** | `.omp/extensions/*.js` | Project-specific hooks (shipped with repo) |
 
+Files are bundled in `.omp/bootstrap/` so the setup script can install them on
+fresh machines without relying on pre-existing global state.
+
 ### Setup
 
-1. **Install the global loader** (one-time, NOT shipped by OMP):
-   Place `project-loader.ts` in `~/.omp/agent/extensions/`. It reads `.omp/extensions/*.js`
-   from the current project on every `session_start` and invokes them.
-
-```ts
-import type { ExtensionAPI } from "@oh-my-pi/pi-coding-agent";
-import * as fs from "fs";
-import * as path from "path";
-
-export default function (pi: ExtensionAPI): void {
-  pi.on("session_start", async (_event, ctx) => {
-    const localDir = path.join(ctx.cwd, ".omp", "extensions");
-    if (!fs.existsSync(localDir)) return;
-
-    const files = fs.readdirSync(localDir).filter(f => f.endsWith(".js"));
-    if (files.length === 0) return;
-
-    for (const file of files) {
-      try {
-        const mod = await import(path.join(localDir, file));
-        if (typeof mod.default === "function") mod.default(pi);
-        if (typeof mod.onSessionStart === "function") await mod.onSessionStart(_event, ctx);
-      } catch (e: unknown) {
-        const msg = e instanceof Error ? e.message : String(e);
-        console.warn(`Project extension ${file} failed to load: ${msg}`);
-      }
-    }
-  });
-}
+```bash
+bash .omp/setup.sh
 ```
 
-2. **Write local extensions** in `.omp/extensions/`. Drop a `.js` file there;
-   it auto-loads on the next session. No config needed.
+Installs the global loader and managed skills from `bootstrap/` into
+`~/.omp/agent/`, then verifies local extensions. Idempotent — skips anything
+already present.
 
 ### Extension contract
 
@@ -232,7 +210,7 @@ Each extension is a CommonJS/ESM module with a default export:
 ```js
 export default function (pi) {
   pi.on("tool_call", async (event, ctx) => {
-    // event: { toolName, input }
+    // event.arguments ?? event.input  (use fallback for compat)
     // ctx: { cwd }
     // Return { block: true, reason: "..." } to veto the tool call
   });

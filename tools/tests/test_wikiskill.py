@@ -224,3 +224,78 @@ def test_validate_tasks_basic(tmp_path):
 
     traces2, r_val2 = wikiskill._validate_tasks(ws, val_tasks, wikiskill.default_scorer, mock_agent_correct)
     assert r_val2 == 0.5  # one of two correct
+
+def test_lessons_path_is_parent(tmp_path):
+    """Lessons file lives at parent of workspace, not inside it."""
+    ws_root = str(tmp_path / "wikiskill-workspaces" / "my-skill")
+    wikiskill.init_workspace(ws_root)
+    p = wikiskill._lessons_path(ws_root)
+    assert p == tmp_path / "wikiskill-workspaces" / "lessons-learned.md"
+
+
+def test_read_lessons_empty(tmp_path):
+    """No lessons file → empty string."""
+    ws_root = str(tmp_path / "wikiskill-workspaces" / "my-skill")
+    wikiskill.init_workspace(ws_root)
+    assert wikiskill.read_lessons(ws_root) == ""
+
+
+def test_append_and_read_lessons(tmp_path):
+    """Append lessons, then read them back."""
+    ws_root = str(tmp_path / "wikiskill-workspaces" / "my-skill")
+    wikiskill.init_workspace(ws_root)
+    wikiskill.append_lessons(ws_root, ["always check visibility defaults", "tags should be lowercase"])
+    text = wikiskill.read_lessons(ws_root)
+    assert "always check visibility defaults" in text
+    assert "tags should be lowercase" in text
+
+
+def test_distill_lessons_mock(tmp_path):
+    """distill_lessons with mock LLM appends to lessons file."""
+    ws_root = str(tmp_path / "wikiskill-workspaces" / "my-skill")
+    wikiskill.init_workspace(ws_root)
+    # Write some wiki + skill-impact content
+    (Path(ws_root) / "wiki" / "patterns").mkdir(parents=True, exist_ok=True)
+    (Path(ws_root) / "wiki" / "patterns" / "test-pattern.md").write_text("# Test\nPattern content")
+    (Path(ws_root) / "wiki" / "skill-impact.md").write_text("## Iteration 1\n- Action: no_action")
+    wikiskill.save_state(ws_root, {"iteration": 1, "r_best": 0.5, "history": []})
+
+    def mock_llm_json(prompt):
+        return {"lessons": ["skills with clear examples perform better"]}
+
+    wikiskill.distill_lessons(ws_root, mock_llm_json)
+    text = wikiskill.read_lessons(ws_root)
+    assert "skills with clear examples perform better" in text
+
+
+def test_apply_skill(tmp_path):
+    """apply_skill writes evolved skill back to target path."""
+    ws_root = str(tmp_path / "ws")
+    target = tmp_path / "real-skill" / "SKILL.md"
+    # Create source skill dir so init_workspace seeds from it
+    source_dir = tmp_path / "source-skill"
+    source_dir.mkdir()
+    (source_dir / "SKILL.md").write_text("# Original skill")
+    wikiskill.init_workspace(ws_root, target_skill=str(source_dir))
+    # Overwrite workspace skill with evolved content
+    ws_skill = Path(ws_root) / "skills" / "source-skill" / "SKILL.md"
+    ws_skill.write_text("# Evolved skill content")
+    # Store target path in state
+    state = wikiskill.load_state(ws_root)
+    state["target_skill_path"] = str(target)
+    wikiskill.save_state(ws_root, state)
+
+    result = wikiskill.apply_skill(ws_root)
+    assert result["applied"] is True
+    assert target.read_text(encoding="utf-8") == "# Evolved skill content"
+
+
+def test_apply_skill_no_target(tmp_path):
+    """apply_skill with no target path → error."""
+    ws_root = str(tmp_path / "ws")
+    wikiskill.init_workspace(ws_root)
+    result = wikiskill.apply_skill(ws_root)
+    assert result["applied"] is False
+    assert "target" in result["error"].lower()
+
+

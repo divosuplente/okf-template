@@ -104,6 +104,9 @@ Respond in JSON:
 Wiki index:
 {wiki_index}
 
+Lessons from prior runs (apply these insights when proposing):
+{lessons_learned}
+
 Skill impact:
 {skill_impact}
 
@@ -114,6 +117,33 @@ Current skill:
 {skill_content}
 """
 
+
+LESSONS_DISTILL_PROMPT = """\
+You are distilling lessons from a completed WikiSkill evolution run.
+
+Analyze the wiki patterns created, the skill-impact log, and the final state.
+Extract 1-3 concise, reusable lessons that future runs on ANY skill can apply.
+Focus on what worked, what didn't, and general patterns — not skill-specific trivia.
+
+Existing lessons file:
+{existing_lessons}
+
+Wiki patterns created this run:
+{wiki_patterns}
+
+Skill-impact log:
+{skill_impact}
+
+Final state: iteration={iteration}, r_best={r_best}
+
+Respond in JSON:
+{{
+  "lessons": [
+    "lesson 1 — concise and reusable",
+    "lesson 2 — ...",
+  ]
+}}
+"""
 
 # ---------------------------------------------------------------------------
 # Workspace management
@@ -158,7 +188,12 @@ def init_workspace(ws_root: str, target_skill: str | None = None) -> Path:
     # Initial state
     state_path = ws / "state.json"
     if not state_path.exists():
-        save_state(str(ws), {"iteration": 0, "r_best": 0.0, "history": []})
+        save_state(str(ws), {
+            "iteration": 0,
+            "r_best": 0.0,
+            "history": [],
+            "target_skill_path": str(Path(target_skill).resolve()) if target_skill else None,
+        })
 
     return ws
 
@@ -349,6 +384,66 @@ def append_skill_impact(
         encoding="utf-8",
     )
 
+def _lessons_path(ws_root: str) -> Path:
+    """Lessons file lives at the parent of individual skill workspaces."""
+    ws = Path(ws_root)
+    return ws.parent / "lessons-learned.md"
+
+def read_lessons(ws_root: str) -> str:
+    """Read accumulated cross-run lessons file, or empty string."""
+    p = _lessons_path(ws_root)
+    if p.exists():
+        return p.read_text(encoding="utf-8")
+    return ""
+
+def append_lessons(ws_root: str, lessons: list[str]) -> None:
+    """Append new lessons to the cross-run lessons file."""
+    p = _lessons_path(ws_root)
+    ts = datetime.now(timezone.utc).strftime("%Y-%m-%dT%H:%M:%SZ")
+    skill_name = Path(ws_root).name
+    existing = p.read_text(encoding="utf-8") if p.exists() else ""
+    new_entries = "\n".join(
+        f"- [{ts}] [{skill_name}] {lesson}" for lesson in lessons
+    )
+    p.write_text(existing + new_entries + "\n", encoding="utf-8")
+
+def distill_lessons(
+    ws_root: str,
+    _llm_json,
+) -> None:
+    """Distill lessons from the completed run and append to lessons file."""
+    ws = Path(ws_root)
+    patterns_dir = ws / "wiki" / "patterns"
+    wiki_patterns = ""
+    if patterns_dir.exists():
+        wiki_patterns = "\n\n".join(
+            f"### {p.stem}\n{p.read_text(encoding='utf-8')}"
+            for p in sorted(patterns_dir.glob("*.md"))
+        ) or "(none)"
+
+    skill_impact = ""
+    si = ws / "wiki" / "skill-impact.md"
+    if si.exists():
+        skill_impact = si.read_text(encoding="utf-8") or "(empty)"
+
+    state = load_state(ws_root)
+    existing_lessons = read_lessons(ws_root) or "(none)"
+
+    prompt = (LESSONS_DISTILL_PROMPT
+        .replace("{existing_lessons}", existing_lessons)
+        .replace("{wiki_patterns}", wiki_patterns)
+        .replace("{skill_impact}", skill_impact)
+        .replace("{iteration}", str(state.get("iteration", 0)))
+        .replace("{r_best}", f"{state.get('r_best', 0.0):.4f}"))
+    try:
+        result = _llm_json(prompt)
+        lessons = result.get("lessons", [])
+        if lessons:
+            append_lessons(ws_root, lessons)
+            print(f"  [lessons] distilled {len(lessons)} lessons", file=sys.stderr)
+    except Exception as e:
+        print(f"  [lessons] distill error: {e}", file=sys.stderr)
+
 
 # ---------------------------------------------------------------------------
 # LLM backend
@@ -520,8 +615,10 @@ def run_iteration(
     n_pass = sum(1 for t in traces if t["passed"])
     n_total = len(traces)
     training_summary = f"Training: {n_pass}/{n_total} passed ({n_pass/max(n_total,1)*100:.0f}%)"
+    lessons_text = read_lessons(ws_root) or "(no prior lessons)"
     proposer_prompt = (SKILL_PROPOSER_PROMPT
         .replace("{wiki_index}", wiki_index or "(empty)")
+        .replace("{lessons_learned}", lessons_text)
         .replace("{skill_impact}", skill_impact or "(no prior proposals)")
         .replace("{training_summary}", training_summary)
         .replace("{skill_content}", skill_content or "(empty skill)"))
@@ -668,9 +765,57 @@ def run_evolution(
         if result["r_best"] >= 1.0:
             print("  Early termination: r_best >= 1.0", file=sys.stderr)
             break
+    # Distill lessons from this run and persist for future runs
+    def _llm_json(prompt):
+        if completion_fn:
+            return _parse_json(completion_fn(prompt))
+        if llm_command:
+            return call_llm_subprocess_json(prompt, llm_command)
+        return {}
+    distill_lessons(ws_root, _llm_json)
 
     return load_state(ws_root)
 
+
+def apply_skill(ws_root: str, target_path: str | None = None) -> dict:
+    """Write the workspace's evolved skill back to the real skill path.
+
+    target_path: override the target; defaults to state['target_skill_path'].
+    Returns dict with summary of what was applied.
+    """
+    ws = Path(ws_root)
+    state = load_state(ws_root)
+
+    # Resolve target
+    target = target_path or state.get("target_skill_path")
+    if not target:
+        return {"applied": False, "error": "No target skill path stored. Use --target."}
+
+    target_p = Path(target)
+    if target_p.is_dir():
+        target_p = target_p / "SKILL.md"
+    if not target_p.parent.exists():
+        target_p.parent.mkdir(parents=True, exist_ok=True)
+
+    # Get evolved skill content
+    _, evolved_content = _get_active_skill(ws_root)
+    if not evolved_content:
+        return {"applied": False, "error": "No skill found in workspace."}
+
+    # Warn if no improvement
+    r_best = state.get("r_best", 0.0)
+    warnings = []
+    if r_best <= 0:
+        warnings.append("r_best=0.0 — skill may not have been tested successfully.")
+
+    # Write
+    target_p.write_text(evolved_content, encoding="utf-8")
+    return {
+        "applied": True,
+        "target": str(target_p),
+        "r_best": r_best,
+        "warnings": warnings,
+    }
 
 def _validate_tasks(
     ws_root: str, val_tasks: list[dict], scorer_fn, _agent,
@@ -976,6 +1121,11 @@ def main(argv=None):
     p_report = sub.add_parser("report", help="Print evolution report")
     p_report.add_argument("--workspace", required=True, help="Workspace directory path")
 
+    # apply
+    p_apply = sub.add_parser("apply", help="Write evolved skill back to real skill path")
+    p_apply.add_argument("--workspace", required=True, help="Workspace directory path")
+    p_apply.add_argument("--target", default=None, help="Override target path (default: stored in state)")
+
     args = parser.parse_args(argv)
 
     if args.command == "init":
@@ -1010,6 +1160,18 @@ def main(argv=None):
     elif args.command == "status":
         state = load_state(args.workspace)
         print(json.dumps(state, indent=2))
+        return 0
+
+    elif args.command == "apply":
+        result = apply_skill(args.workspace, args.target)
+        if result.get("applied"):
+            print(f"Applied evolved skill to: {result['target']}")
+            print(f"  r_best={result['r_best']:.4f}")
+            for w in result.get("warnings", []):
+                print(f"  WARNING: {w}", file=sys.stderr)
+        else:
+            print(f"Error: {result.get('error', 'unknown')}", file=sys.stderr)
+            return 1
         return 0
 
     elif args.command == "report":

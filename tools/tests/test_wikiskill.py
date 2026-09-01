@@ -299,3 +299,102 @@ def test_apply_skill_no_target(tmp_path):
     assert "target" in result["error"].lower()
 
 
+
+def test_task_generator_prompt_no_double_braces():
+    """TASK_GENERATOR_PROMPT must not contain {{ — .replace() doesn't unescape."""
+    assert "{{" not in wikiskill.TASK_GENERATOR_PROMPT
+    # Render with replacements to ensure valid example JSON in output
+    rendered = wikiskill.TASK_GENERATOR_PROMPT.replace(
+        "{skill_content}", "test skill"
+    ).replace("{n}", "3")
+    assert '{"id"' in rendered
+    assert '{{' not in rendered
+
+
+def test_generate_tasks_with_llm_json():
+    """generate_tasks uses _llm_json injection for task generation."""
+    calls = []
+    def _mock_json(prompt):
+        calls.append(prompt)
+        if "5" in prompt:  # n_train=5
+            return [{"id": "t1", "description": "test task", "expected": "answer"}]
+        return [{"id": "v1", "description": "val task", "expected": "val answer"}]
+    train, val = wikiskill.generate_tasks(
+        "skill content", n_train=5, n_val=3,
+        command="unused", _llm_json=_mock_json,
+    )
+    assert len(train) == 1
+    assert train[0]["id"] == "t1"
+    assert len(val) == 1
+    assert val[0]["id"] == "v1"
+    assert len(calls) == 2  # train + val
+
+
+def test_make_judge_scorer_parses_score():
+    """make_judge_scorer extracts SCORE: float and clamps to [0,1]."""
+    def _mock_llm(prompt):
+        return "Some analysis.\nSCORE: 0.85"
+    scorer = wikiskill.make_judge_scorer("unused", _llm=_mock_llm)
+    task = {"expected": "42", "description": "What is 6*7?"}
+    assert scorer(task, "42") == 0.85
+
+
+def test_make_judge_scorer_clamps():
+    """make_judge_scorer clamps values outside [0,1]."""
+    def _mock_llm(prompt):
+        return "SCORE: 1.5"
+    scorer = wikiskill.make_judge_scorer("unused", _llm=_mock_llm)
+    assert scorer({"expected": "x"}, "x") == 1.0
+    def _mock_llm_neg(prompt):
+        return "SCORE: -0.3"
+    scorer2 = wikiskill.make_judge_scorer("unused", _llm=_mock_llm_neg)
+    assert scorer2({"expected": "x"}, "x") == 0.0
+
+
+def test_make_judge_scorer_fallback():
+    """make_judge_scorer falls back to default_scorer when no SCORE: line."""
+    def _mock_llm(prompt):
+        return "No score line here"
+    scorer = wikiskill.make_judge_scorer("unused", _llm=_mock_llm)
+    task = {"expected": "Paris", "description": "Capital of France?"}
+    assert scorer(task, "Paris") == 1.0  # default_scorer exact match
+
+
+def test_distill_lessons_error_no_corruption(tmp_path):
+    """distill_lessons with failing LLM leaves existing lessons intact."""
+    ws_root = str(tmp_path / "ws")
+    wikiskill.init_workspace(ws_root)
+    wikiskill.append_lessons(ws_root, ["existing lesson"])
+    def _raising_llm(prompt):
+        raise ValueError("LLM exploded")
+    # Should not raise, should not corrupt existing lessons
+    wikiskill.distill_lessons(ws_root, _raising_llm)
+    text = wikiskill.read_lessons(ws_root)
+    assert "existing lesson" in text
+
+
+def test_append_lessons_cross_run(tmp_path):
+    """append_lessons called twice accumulates both sets."""
+    ws_root = str(tmp_path / "ws")
+    wikiskill.init_workspace(ws_root)
+    wikiskill.append_lessons(ws_root, ["first run lesson"])
+    wikiskill.append_lessons(ws_root, ["second run lesson"])
+    text = wikiskill.read_lessons(ws_root)
+    assert "first run lesson" in text
+    assert "second run lesson" in text
+
+
+def test_apply_skill_with_target_override(tmp_path):
+    """apply_skill with --target override ignores state target_skill_path."""
+    ws_root = str(tmp_path / "ws")
+    wikiskill.init_workspace(ws_root)
+    # Write evolved skill
+    (tmp_path / "ws" / "skills" / "default-skill" / "SKILL.md").write_text(
+        "# Evolved", encoding="utf-8"
+    )
+    # State has one target, but we override with different path
+    override = tmp_path / "override-target" / "SKILL.md"
+    result = wikiskill.apply_skill(ws_root, target_path=str(override))
+    assert result["applied"] is True
+    assert override.read_text(encoding="utf-8") == "# Evolved"
+

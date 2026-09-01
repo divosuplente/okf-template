@@ -137,12 +137,12 @@ Skill-impact log:
 Final state: iteration={iteration}, r_best={r_best}
 
 Respond in JSON:
-{{
+{
   "lessons": [
     "lesson 1 — concise and reusable",
-    "lesson 2 — ...",
+    "lesson 2 — ..."
   ]
-}}
+}
 """
 
 # ---------------------------------------------------------------------------
@@ -283,7 +283,7 @@ def load_scorer(scorer_spec: str | None):
 
 def _safe_name(name: str, fallback: str = "unnamed") -> str:
     """Sanitize LLM-provided name to a safe basename."""
-    if not name or "/" in name or "\\" in name or ".." in name:
+    if not name or "/" in name or "\\" in name or ".." in name or "\0" in name:
         return fallback
     return name
 
@@ -565,7 +565,7 @@ def run_iteration(
 
     traces = []
     for task in train_tasks:
-        task_id = task.get("id", str(task.get("task_id", "")))
+        task_id = _safe_name(task.get("id", str(task.get("task_id", ""))))
         prompt = (INFERENCE_PROMPT_TEMPLATE
             .replace("{skill_content}", skill_content)
             .replace("{task_description}", task.get("description", task.get("task", ""))))
@@ -672,7 +672,6 @@ def run_iteration(
 
     # Update state
     state["iteration"] = iteration
-    state["r_best"] = max(r_val, r_best) if accepted else r_best
     if accepted:
         state["r_best"] = r_val
     state["history"].append({
@@ -771,7 +770,7 @@ def run_evolution(
             return _parse_json(completion_fn(prompt))
         if llm_command:
             return call_llm_subprocess_json(prompt, llm_command)
-        return {}
+        raise RuntimeError("No LLM backend: pass completion_fn or --llm-command")
     distill_lessons(ws_root, _llm_json)
 
     return load_state(ws_root)
@@ -824,7 +823,7 @@ def _validate_tasks(
     _, skill_content = _get_active_skill(ws_root)
     traces = []
     for task in val_tasks:
-        task_id = task.get("id", str(task.get("task_id", "")))
+        task_id = _safe_name(task.get("id", str(task.get("task_id", ""))))
         prompt = (INFERENCE_PROMPT_TEMPLATE
             .replace("{skill_content}", skill_content)
             .replace("{task_description}", task.get("description", task.get("task", ""))))
@@ -928,7 +927,7 @@ Generate {n} tasks. Each task should:
 
 Respond as a JSON array:
 [
-  {{"id": "t1", "description": "<task prompt>", "expected": "<correct answer>"}},
+  {"id": "t1", "description": "<task prompt>", "expected": "<correct answer>"},
   ...
 ]
 """

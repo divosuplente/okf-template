@@ -33,3 +33,6 @@ tools/sql_cache.duckdb-shm
 # Obsidian editor state
 .obsidian/workspace.json
 .obsidian/workspace-mobile.json
+
+# WikiSkill workspace artifacts (ephemeral)
+wikiskill-workspaces/

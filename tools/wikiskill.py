@@ -302,6 +302,7 @@ def update_wiki(ws_root: str, patterns: list[dict], log_entry: str) -> None:
     """Apply wiki maintainer output: create/update pattern files, append to logs."""
     ws = Path(ws_root)
     patterns_dir = ws / "wiki" / "patterns"
+    patterns_dir.mkdir(parents=True, exist_ok=True)
     index = ws / "wiki" / "index.md"
     logs = ws / "wiki" / "logs.md"
 
@@ -760,6 +761,178 @@ def generate_report(ws_root: str) -> str:
 
 
 # ---------------------------------------------------------------------------
+# Auto mode: generate tasks + LLM-judge scorer from a skill file
+# ---------------------------------------------------------------------------
+
+
+TASK_GENERATOR_PROMPT = """\
+You are a task generator for the WikiSkill framework.
+
+Read the following skill instructions and generate diverse, testable tasks
+that exercise what the skill teaches. Each task should have a clear,
+verifiable expected answer.
+
+--- SKILL ---
+{skill_content}
+--- END SKILL ---
+
+Generate {n} tasks. Each task should:
+- Test a different aspect of what the skill covers
+- Have a short, specific description (1-2 sentences)
+- Have an "expected" field with the correct or best answer
+
+Respond as a JSON array:
+[
+  {{"id": "t1", "description": "<task prompt>", "expected": "<correct answer>"}},
+  ...
+]
+"""
+
+
+JUDGE_PROMPT = """\
+You are an answer judge. Score how well the response answers the task.
+
+Task: {task_description}
+
+Expected: {expected}
+
+Response: {answer}
+
+Respond with a single float 0.0 (completely wrong) to 1.0 (perfect).
+Return only the number on the last line starting with "SCORE: ".
+"""
+
+
+def generate_tasks(
+    skill_content: str, n_train: int, n_val: int,
+    command: str,
+    _llm_json=None,
+) -> tuple[list[dict], list[dict]]:
+    """Generate train/val tasks from skill content using an LLM."""
+    def _default_json(prompt):
+        return call_llm_subprocess_json(prompt, command)
+    _json = _llm_json or _default_json
+
+    train = _json(TASK_GENERATOR_PROMPT.replace(
+        "{skill_content}", skill_content
+    ).replace(
+        "{n}", str(n_train)
+    ))
+    val = _json(TASK_GENERATOR_PROMPT.replace(
+        "{skill_content}", skill_content
+    ).replace(
+        "{n}", str(n_val)
+    ))
+
+    # Ensure ids
+    for i, t in enumerate(train, 1):
+        t.setdefault("id", f"t{i}")
+    for i, v in enumerate(val, 1):
+        v.setdefault("id", f"v{i}")
+
+    return train, val
+
+
+def make_judge_scorer(command: str, _llm=None):
+    """Create an LLM-judge scorer that scores answers 0.0–1.0."""
+    def _llm_call(prompt):
+        return call_llm_subprocess(prompt, command)
+    _call = _llm or _llm_call
+
+    def scorer(task: dict, answer: str) -> float:
+        prompt = (JUDGE_PROMPT
+            .replace("{task_description}", task.get("description", task.get("task", "")))
+            .replace("{expected}", str(task.get("expected", "")))
+            .replace("{answer}", answer[:4000]))
+        resp = _call(prompt)
+        if "SCORE:" in resp:
+            try:
+                return max(0.0, min(1.0, float(resp.split("SCORE:")[-1].strip())))
+            except ValueError:
+                pass
+        # Fallback: substring match
+        return default_scorer(task, answer)
+
+    return scorer
+
+
+def run_auto(
+    skill_path: str,
+    command: str,
+    max_iters: int = 8,
+    n_train: int = 5,
+    n_val: int = 3,
+    workspace: str | None = None,
+    agent_fn=None,
+    completion_fn=None,
+    _generate=None,
+) -> dict:
+    """Run the full WikiSkill loop on a skill with auto-generated tasks.
+
+    Requires either --llm-command (CLI) or agent_fn/completion_fn (programmatic).
+    """
+    # Read skill content
+    sp = Path(skill_path)
+    if sp.is_dir():
+        sp = sp / "SKILL.md"
+    if not sp.exists():
+        raise FileNotFoundError(f"Skill not found: {skill_path}")
+    skill_content = sp.read_text(encoding="utf-8")
+    skill_name = sp.parent.name if sp.name == "SKILL.md" else sp.stem
+
+    # Workspace
+    ws = workspace or f"wikiskill-workspaces/{skill_name}"
+    # init_workspace expects a directory or file path; resolve to parent dir if it's SKILL.md
+    init_target = str(sp.parent) if sp.is_file() and sp.name == "SKILL.md" else skill_path
+    init_workspace(ws, target_skill=init_target)
+
+    # Generate tasks
+    print(f"Generating tasks for skill '{skill_name}'...", file=sys.stderr)
+    if _generate:
+        # Programmatic path
+        train_tasks, val_tasks = _generate(skill_content, n_train, n_val)
+    elif agent_fn and completion_fn:
+        # Programmatic: wire completion_fn for task generation
+        def _gen_json(prompt):
+            return _parse_json(completion_fn(prompt))
+        train_tasks, val_tasks = generate_tasks(
+            skill_content, n_train, n_val, command, _llm_json=_gen_json,
+        )
+    else:
+        train_tasks, val_tasks = generate_tasks(
+            skill_content, n_train, n_val, command,
+        )
+    print(f"  Generated {len(train_tasks)} train, {len(val_tasks)} val tasks", file=sys.stderr)
+
+    # Save tasks for reproducibility
+    (Path(ws) / "train-tasks.json").write_text(
+        json.dumps(train_tasks, indent=2)
+    )
+    (Path(ws) / "val-tasks.json").write_text(
+        json.dumps(val_tasks, indent=2)
+    )
+
+    # Scorer
+    if agent_fn and completion_fn:
+        # Programmatic: use completion for judge
+        def _judge_llm(prompt):
+            return completion_fn(prompt)
+        scorer_fn = make_judge_scorer(command, _llm=_judge_llm)
+    else:
+        scorer_fn = make_judge_scorer(command)
+
+    # Run evolution
+    return run_evolution(
+        ws, train_tasks, val_tasks,
+        max_iters=max_iters,
+        scorer_fn=scorer_fn,
+        agent_fn=agent_fn,
+        completion_fn=completion_fn,
+        llm_command=command if not agent_fn else None,
+    )
+
+
+# ---------------------------------------------------------------------------
 # CLI
 # ---------------------------------------------------------------------------
 
@@ -786,6 +959,15 @@ def main(argv=None):
         help="Shell command for LLM calls (prompt on stdin, response on stdout)",
     )
 
+    # auto
+    p_auto = sub.add_parser("auto", help="Run evolution on a skill with auto-generated tasks and LLM-judge scorer")
+    p_auto.add_argument("--skill", required=True, help="Path to skill dir or SKILL.md to evolve")
+    p_auto.add_argument("--llm-command", required=True, help="Shell command for LLM calls (prompt on stdin, response on stdout)")
+    p_auto.add_argument("--max-iters", type=int, default=8, help="Max iterations (default: 8)")
+    p_auto.add_argument("--n-train", type=int, default=5, help="Number of train tasks to generate (default: 5)")
+    p_auto.add_argument("--n-val", type=int, default=3, help="Number of val tasks to generate (default: 3)")
+    p_auto.add_argument("--workspace", default=None, help="Workspace dir (default: wikiskill-workspaces/<skill-name>)")
+
     # status
     p_status = sub.add_parser("status", help="Show current state")
     p_status.add_argument("--workspace", required=True, help="Workspace directory path")
@@ -810,6 +992,17 @@ def main(argv=None):
             max_iters=args.max_iters,
             scorer_fn=scorer_fn,
             llm_command=args.llm_command,
+        )
+        print(f"\nFinal state: iteration={state['iteration']}, r_best={state['r_best']:.4f}")
+        return 0
+    elif args.command == "auto":
+        state = run_auto(
+            skill_path=args.skill,
+            command=args.llm_command,
+            max_iters=args.max_iters,
+            n_train=args.n_train,
+            n_val=args.n_val,
+            workspace=args.workspace,
         )
         print(f"\nFinal state: iteration={state['iteration']}, r_best={state['r_best']:.4f}")
         return 0

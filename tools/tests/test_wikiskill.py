@@ -87,16 +87,6 @@ def test_apply_patch_unknown_op():
         assert "unknown op" in str(e)
 
 
-def test_generate_diff():
-    old = "line1\nline2\nline3\n"
-    new = "line1\nchanged\nline3\n"
-    diff = wikiskill.generate_diff(old, new)
-    assert "--- a/SKILL.md" in diff
-    assert "+++ b/SKILL.md" in diff
-    assert "-line2" in diff
-    assert "+changed" in diff
-
-
 def test_load_scorer_default():
     fn = wikiskill.load_scorer(None)
     assert fn is wikiskill.default_scorer
@@ -130,3 +120,107 @@ def test_state_round_trip(tmp_path):
     wikiskill.save_state(ws, state)
     loaded = wikiskill.load_state(ws)
     assert loaded == state
+
+
+def test_safe_name_rejects_traversal():
+    assert wikiskill._safe_name("../../etc/passwd") == "unnamed"
+    assert wikiskill._safe_name("foo/bar") == "unnamed"
+    assert wikiskill._safe_name("foo\\bar") == "unnamed"
+    assert wikiskill._safe_name("..") == "unnamed"
+    assert wikiskill._safe_name("") == "unnamed"
+    assert wikiskill._safe_name(None) == "unnamed"
+    assert wikiskill._safe_name("good-name") == "good-name"
+    assert wikiskill._safe_name("good_name") == "good_name"
+
+
+def test_safe_name_custom_fallback():
+    assert wikiskill._safe_name("../bad", "default") == "default"
+    assert wikiskill._safe_name("ok", "default") == "ok"
+
+
+def _setup_ws(tmp_path):
+    """Create an initialized workspace for tests."""
+    ws = str(tmp_path / "ws")
+    wikiskill.init_workspace(ws)
+    return ws
+
+
+def test_run_iteration_accept(tmp_path):
+    """Mock agent_fn returns correct answers → iteration accepted."""
+    ws = _setup_ws(tmp_path)
+    train = [{"id": "t1", "description": "What is 2+2?", "expected": "4"}]
+
+    # agent_fn returns: inference → "ANSWER: 4", proposer → no_action JSON, validation → "ANSWER: 2"
+    call_count = [0]
+    def mock_agent(prompt):
+        call_count[0] += 1
+        if "Skill Proposer" in prompt:
+            return '{"action": "no_action", "summary": "skip"}'
+        return "ANSWER: 4"
+
+    # completion_fn returns wiki maintainer JSON
+    def mock_completion(prompt):
+        return '{"patterns": [], "log_entry": "noop"}'
+
+    result = wikiskill.run_iteration(
+        ws, iteration=1, train_tasks=train,
+        val_tasks=[{"id": "v1", "description": "What is 2+2?", "expected": "4"}],
+        scorer_fn=wikiskill.default_scorer,
+        agent_fn=mock_agent, completion_fn=mock_completion,
+    )
+    assert result["accepted"] is True
+    assert result["r_val"] >= 0.5
+    assert result["r_best"] >= 0.5
+    state = wikiskill.load_state(ws)
+    assert state["history"][-1]["accepted"] is True
+
+
+def test_run_iteration_reject_rollback(tmp_path):
+    """Mock agent_fn returns wrong answers → iteration rejected, skills rolled back."""
+    ws = _setup_ws(tmp_path)
+    train = [{"id": "t1", "description": "What is 2+2?", "expected": "4"}]
+
+    def mock_agent(prompt):
+        if "Skill Proposer" in prompt:
+            return '{"action": "no_action", "summary": "skip"}'
+        # Return wrong answer for both train and val
+        return "ANSWER: 99"
+
+    def mock_completion(prompt):
+        return '{"patterns": [], "log_entry": "noop"}'
+
+    result = wikiskill.run_iteration(
+        ws, iteration=1, train_tasks=train,
+        val_tasks=[{"id": "v1", "description": "What is 2+2?", "expected": "4"}],
+        scorer_fn=wikiskill.default_scorer,
+        agent_fn=mock_agent, completion_fn=mock_completion,
+    )
+    assert result["accepted"] is False
+    assert result["r_val"] == 0.0
+    assert result["r_best"] == 0.0
+    state = wikiskill.load_state(ws)
+    assert state["history"][-1]["accepted"] is False
+
+
+def test_validate_tasks_basic(tmp_path):
+    """Unit test for _validate_tasks helper."""
+    ws = str(tmp_path / "ws")
+    wikiskill.init_workspace(ws)
+    val_tasks = [
+        {"id": "v1", "description": "What is 2+2?", "expected": "4"},
+        {"id": "v2", "description": "Capital of France?", "expected": "Paris"},
+    ]
+
+    def mock_agent(prompt):
+        return "ANSWER: wrong"
+
+    traces, r_val = wikiskill._validate_tasks(ws, val_tasks, wikiskill.default_scorer, mock_agent)
+    assert r_val == 0.0
+    assert len(traces) == 2
+    assert all(t["passed"] is False for t in traces)
+
+    def mock_agent_correct(prompt):
+        return "ANSWER: 4"
+
+    traces2, r_val2 = wikiskill._validate_tasks(ws, val_tasks, wikiskill.default_scorer, mock_agent_correct)
+    assert r_val2 == 0.5  # one of two correct

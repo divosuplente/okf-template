@@ -19,10 +19,8 @@ For programmatic use from the eval kernel:
 from __future__ import annotations
 
 import argparse
-import difflib
 import importlib
 import json
-import os
 import shutil
 import subprocess
 import sys
@@ -248,6 +246,12 @@ def load_scorer(scorer_spec: str | None):
     module = importlib.import_module(module_name)
     return getattr(module, func_name)
 
+def _safe_name(name: str, fallback: str = "unnamed") -> str:
+    """Sanitize LLM-provided name to a safe basename."""
+    if not name or "/" in name or "\\" in name or ".." in name:
+        return fallback
+    return name
+
 
 # ---------------------------------------------------------------------------
 # Patching
@@ -276,15 +280,6 @@ def apply_patch(content: str, op: str, target: str, replacement: str) -> str:
         raise ValueError(f"apply_patch: unknown op '{op}'")
 
 
-def generate_diff(old: str, new: str, label: str = "SKILL.md") -> str:
-    """Generate unified diff for audit trail."""
-    diff = difflib.unified_diff(
-        old.splitlines(keepends=True),
-        new.splitlines(keepends=True),
-        fromfile=f"a/{label}",
-        tofile=f"b/{label}",
-    )
-    return "".join(diff)
 
 
 # ---------------------------------------------------------------------------
@@ -312,7 +307,7 @@ def update_wiki(ws_root: str, patterns: list[dict], log_entry: str) -> None:
 
     for pat in patterns:
         action = pat.get("action", "")
-        name = pat.get("name", "unnamed")
+        name = _safe_name(pat.get("name", "unnamed"), "unnamed")
         content = pat.get("content", "")
         pfile = patterns_dir / f"{name}.md"
         if action == "create":
@@ -475,10 +470,9 @@ def run_iteration(
     traces = []
     for task in train_tasks:
         task_id = task.get("id", str(task.get("task_id", "")))
-        prompt = INFERENCE_PROMPT_TEMPLATE.format(
-            skill_content=skill_content,
-            task_description=task.get("description", task.get("task", "")),
-        )
+        prompt = (INFERENCE_PROMPT_TEMPLATE
+            .replace("{skill_content}", skill_content)
+            .replace("{task_description}", task.get("description", task.get("task", ""))))
         try:
             response = _agent(prompt)
         except Exception as e:
@@ -540,7 +534,7 @@ def run_iteration(
     # Apply proposal
     action = proposal.get("action", "no_action")
     if action == "create":
-        new_name = proposal.get("skill_name", "proposed-skill")
+        new_name = _safe_name(proposal.get("skill_name", "proposed-skill"), "proposed-skill")
         new_dir = ws / "skills" / new_name
         new_dir.mkdir(parents=True, exist_ok=True)
         (new_dir / "SKILL.md").write_text(
@@ -567,25 +561,7 @@ def run_iteration(
         skill_file.write_text(new_content, encoding="utf-8")
 
     # Validation inference
-    val_traces = []
-    _, val_skill = _get_active_skill(ws_root)
-    for task in val_tasks:
-        task_id = task.get("id", str(task.get("task_id", "")))
-        prompt = INFERENCE_PROMPT_TEMPLATE.format(
-            skill_content=val_skill,
-            task_description=task.get("description", task.get("task", "")),
-        )
-        try:
-            response = _agent(prompt)
-        except Exception as e:
-            response = f"[ERROR] {e}"
-        answer = response
-        if "ANSWER:" in response:
-            answer = response.split("ANSWER:")[-1].strip()
-        score = scorer_fn(task, answer)
-        val_traces.append({"task_id": task_id, "score": score, "passed": score >= 0.5})
-
-    r_val = sum(t["score"] for t in val_traces) / max(len(val_traces), 1)
+    val_traces, r_val = _validate_tasks(ws_root, val_tasks, scorer_fn, _agent)
     r_best = state.get("r_best", 0.0)
     accepted = r_val > r_best
 
@@ -695,6 +671,30 @@ def run_evolution(
     return load_state(ws_root)
 
 
+def _validate_tasks(
+    ws_root: str, val_tasks: list[dict], scorer_fn, _agent,
+) -> tuple[list[dict], float]:
+    """Run inference on val_tasks, return (traces, mean_score)."""
+    _, skill_content = _get_active_skill(ws_root)
+    traces = []
+    for task in val_tasks:
+        task_id = task.get("id", str(task.get("task_id", "")))
+        prompt = (INFERENCE_PROMPT_TEMPLATE
+            .replace("{skill_content}", skill_content)
+            .replace("{task_description}", task.get("description", task.get("task", ""))))
+        try:
+            response = _agent(prompt)
+        except Exception as e:
+            response = f"[ERROR] {e}"
+        answer = response
+        if "ANSWER:" in response:
+            answer = response.split("ANSWER:")[-1].strip()
+        score = scorer_fn(task, answer)
+        traces.append({"task_id": task_id, "score": score, "passed": score >= 0.5})
+    r_val = sum(t["score"] for t in traces) / max(len(traces), 1)
+    return traces, r_val
+
+
 def _run_validation(
     ws_root: str, val_tasks: list[dict], scorer_fn,
     agent_fn=None, llm_command: str | None = None,
@@ -706,23 +706,7 @@ def _run_validation(
         if llm_command:
             return call_llm_subprocess(prompt, llm_command)
         raise RuntimeError("No LLM backend")
-
-    _, skill_content = _get_active_skill(ws_root)
-    scores = []
-    for task in val_tasks:
-        prompt = INFERENCE_PROMPT_TEMPLATE.format(
-            skill_content=skill_content,
-            task_description=task.get("description", task.get("task", "")),
-        )
-        try:
-            response = _agent(prompt)
-        except Exception as e:
-            response = f"[ERROR] {e}"
-        answer = response
-        if "ANSWER:" in response:
-            answer = response.split("ANSWER:")[-1].strip()
-        scores.append(scorer_fn(task, answer))
-    return sum(scores) / max(len(scores), 1)
+    return _validate_tasks(ws_root, val_tasks, scorer_fn, _agent)[1]
 
 # ---------------------------------------------------------------------------
 # Report

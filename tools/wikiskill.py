@@ -604,6 +604,7 @@ def run_iteration(
     state["history"].append({
         "k": iteration,
         "r_val": r_val,
+        "r_best": state["r_best"],
         "accepted": accepted,
         "proposal_summary": proposal.get("summary", action),
     })
@@ -657,8 +658,22 @@ def run_evolution(
         scorer_fn = default_scorer
 
     state = load_state(ws_root)
+    # Baseline validation (iteration 0): seed r_best so first proposal gates against it
+    if state.get("iteration", 0) == 0:
+        print("=== Baseline validation (iteration 0) ===", file=sys.stderr)
+        r_baseline = _run_validation(
+            ws_root, val_tasks, scorer_fn,
+            agent_fn=agent_fn, llm_command=llm_command,
+        )
+        state["r_best"] = r_baseline
+        state["history"].append({
+            "k": 0, "r_val": r_baseline, "r_best": r_baseline,
+            "accepted": False,
+            "proposal_summary": "baseline (no skill change)",
+        })
+        save_state(ws_root, state)
+        print(f"  r_baseline={r_baseline:.4f}", file=sys.stderr)
     start_iter = state.get("iteration", 0) + 1
-
     for k in range(start_iter, start_iter + max_iters):
         print(f"=== Iteration {k} ===", file=sys.stderr)
         result = run_iteration(
@@ -680,6 +695,35 @@ def run_evolution(
     return load_state(ws_root)
 
 
+def _run_validation(
+    ws_root: str, val_tasks: list[dict], scorer_fn,
+    agent_fn=None, llm_command: str | None = None,
+) -> float:
+    """Run validation inference with current skills, return mean score."""
+    def _agent(prompt: str) -> str:
+        if agent_fn:
+            return agent_fn(prompt)
+        if llm_command:
+            return call_llm_subprocess(prompt, llm_command)
+        raise RuntimeError("No LLM backend")
+
+    _, skill_content = _get_active_skill(ws_root)
+    scores = []
+    for task in val_tasks:
+        prompt = INFERENCE_PROMPT_TEMPLATE.format(
+            skill_content=skill_content,
+            task_description=task.get("description", task.get("task", "")),
+        )
+        try:
+            response = _agent(prompt)
+        except Exception as e:
+            response = f"[ERROR] {e}"
+        answer = response
+        if "ANSWER:" in response:
+            answer = response.split("ANSWER:")[-1].strip()
+        scores.append(scorer_fn(task, answer))
+    return sum(scores) / max(len(scores), 1)
+
 # ---------------------------------------------------------------------------
 # Report
 # ---------------------------------------------------------------------------
@@ -697,7 +741,7 @@ def generate_report(ws_root: str) -> str:
     lines.append("|-----------|-------|--------|----------|---------|")
     for h in state.get("history", []):
         lines.append(
-            f"| {h['k']} | {h['r_val']:.4f} | "
+            f"| {h['k']} | {h['r_val']:.4f} | {h.get('r_best', 0.0):.4f} | "
             f"{'✓' if h['accepted'] else '✗'} | {h.get('proposal_summary', '')} |"
         )
     lines.append("")

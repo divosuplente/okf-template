@@ -257,7 +257,13 @@ Two LLM checks (you do these as the final validation):
 
 - **Answerability** — answer 5-10 real questions about the channel's content by navigating only the concept pages. Verify each answer cites real concepts. Then try 3-5 trap questions (out-of-scope/false premise) — the correct behavior is to say "not covered," NOT to invent an answer.
 - **Recall coverage** — sample 5-10 videos, extract their core ideas, verify each durable idea has a covering concept page. Target: >90% coverage.
+- **Enroll channel for tracking** — register the channel in `tools/channel_check.db` so periodic checks detect new videos:
 
+```bash
+sqlite3 tools/channel_check.db "INSERT OR IGNORE INTO channels (handle, url, label) VALUES ('@ChannelHandle', 'https://www.youtube.com/@ChannelHandle/videos', 'Channel Label')"
+```
+
+Extract `@ChannelHandle` and `Channel Label` from the manifest or creator page. `INSERT OR IGNORE` makes this idempotent.
 ---
 
 ## Batching for Large Channels

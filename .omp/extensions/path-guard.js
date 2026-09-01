@@ -19,7 +19,11 @@ export default function (pi) {
     const { allowed, readonly } = parseRules(content);
     const targets = getTargets(event.toolName, event.arguments ?? event.input);
     for (const raw of targets) {
-      const resolved = path.isAbsolute(raw) ? raw : path.resolve(ctx.cwd, raw);
+      const resolved = path.isAbsolute(raw)
+        ? raw
+        : raw.match(/^\w+:\/\//)
+          ? raw
+          : path.resolve(ctx.cwd, raw);
 
       let absAllowed = false;
       for (const aPath of allowed) {
@@ -33,7 +37,9 @@ export default function (pi) {
       }
       if (absAllowed) continue;
 
-      const rel = path.relative(ctx.cwd, resolved).replace(/\\/g, "/");
+      const rel = raw.match(/^\w+:\/\//)
+        ? raw
+        : path.relative(ctx.cwd, resolved).replace(/\\/g, "/");
       if (rel.startsWith("..")) {
         return { block: true, reason: `Attempt to access path outside repo root: ${raw}` };
       }
@@ -67,7 +73,12 @@ function parseRules(content) {
   for (const line of content.split("\n")) {
     if (line.includes("**Allowed Paths")) section = "allowed";
     else if (line.includes("**Read-Only Paths")) section = "readonly";
-    else if (line.startsWith("**") || line.startsWith("#") || (line.trim() && !line.startsWith("- "))) section = null;
+    else if (
+      line.startsWith("**") ||
+      line.startsWith("#") ||
+      (line.trim() && !line.startsWith("- "))
+    )
+      section = null;
 
     if (section && line.startsWith("- ")) {
       const foundRules = line.match(/`([^`]+)`/g);

@@ -13,5 +13,6 @@ type: skill
 
 ## Close
 - Update `index.md` counts if needed
+- Enroll channel for tracking: `sqlite3 tools/channel_check.db "INSERT OR IGNORE INTO channels (handle, url, label) VALUES ('@Handle', 'https://www.youtube.com/@Handle/videos', 'Label')"`
 - Append `log.md` entry for the channel run
 - Stop or route via root `CONTEXT.md`

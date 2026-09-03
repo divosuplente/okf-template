@@ -28,12 +28,14 @@ When the user includes `#tag` tokens in their message, extract them as concept t
 
 ## YouTube Video Ingest (special handling)
 
-### Step 1: Fetch Metadata + Transcript
+### Step 1: Fetch Metadata + Transcript + Preprocess VTT
 ```bash
 yt-dlp --dump-json --write-auto-sub --skip-download --sub-langs en --sub-format vtt -o "/tmp/okf_yt_<videoid>" "URL"
 ```
 Extract from JSON: title, channel, uploader, upload_date, duration, view_count, description, tags.
-Parse VTT file for clean transcript (strip VTT headers, timing lines, HTML tags; deduplicate cues).
+
+**VTT preprocessing** (mandatory — never read raw VTT directly):
+Strip `<c>` timing tags, deduplicate overlapping cues, produce clean prose. For long videos (>30 min), split into ~800-word chunks. Read ALL chunks — never sample. See `SKILL.md` Step 1 for the full Python preprocessing function.
 
 ### Step 2: Creator Concept
 Check if the channel/creator already has a concept:
@@ -79,15 +81,15 @@ For each linked tool/resource (skip social media profiles — they're not tools)
 - Generic YouTube playlist links — not tools
 - Links to other videos on the same channel — not tools
 
-### Step 4: Raw Snapshot
-Write `raw/youtube/<video_id>.md` with:
-- URL, channel, upload date, duration, views, fetch date, method
-- Full description (verbatim)
-- Tags
-- Full verbatim transcript
+### Step 4: Raw Snapshot (VTT only)
+Write the **verbatim VTT file** to `raw/youtube/<video_id>.vtt`:
+```bash
+cp /tmp/okf_yt_<videoid>.en.vtt raw/youtube/<video_id>.vtt
+```
+Do NOT write a plain-text transcript `.md` to `raw/` — the preprocessed transcript is an intermediate working file. The VTT is the authoritative snapshot; the knowledge extract lives in `concepts/.../references/` (Step 5b).
 
-### Step 5: Create Video Concept
-`concepts/learning/<slug>.md` with frontmatter:
+### Step 5: Create Video Concept (overview)
+`concepts/learning/<slug>.md` — concise overview (~50-80 lines) with frontmatter:
 ```yaml
 ---
 type: learning
@@ -97,20 +99,31 @@ description: <one-line summary of the ACTUAL content, not just the title>
 domain: learning
 tags: [<parsed hashtags + auto tags>]
 source:
-  - youtube:watch?v=<video_id>
-timestamp: <today>
+  - https://www.youtube.com/watch?v=<video_id>
+generated:
+  by: agent:harness
+  at: <ISO timestamp>
 status: active
 ---
 ```
 
-Body structure:
+**Concept body = concise overview.** Structure:
 - `# Title`
-- `## Summary` — channel, date, duration, views, main idea (from ACTUAL transcript, not description)
-- `## Key Concepts` — core thesis with examples from transcript
-- `## Creator` — link to creator concept: `[<Channel Name>](/concepts/creators/<slug>.md)`
-- `## Linked Tools & Resources` — list each extracted tool with its concept link
+- One-paragraph summary (from ACTUAL transcript, not description)
+- Link to reference file: `> **Full knowledge extract:** [Title — Knowledge Reference](/concepts/<dom>/<sub>/references/<slug>.md)`
+- Structured outline (sections with one-line summaries)
 - `## Related Concepts` — cross-link to existing OKF concepts
-- `## References` — original video URL
+- `## Citations` — original video URL
+
+### Step 5b: Create Deep Reference File (knowledge extraction with sources)
+For substantive content (>15 min, educational/technical), create `concepts/<dom>/<sub>/references/<slug>.md`:
+- Full knowledge extract organized by the source's natural divisions
+- For each concept mentioned: extract the teaching, expand with primary sources (author, year, paper title)
+- `read` Wikipedia articles directly for source expansion
+- `## Citations` — numbered bibliography
+- Bidirectional link: `> **Parent concept:** [link]`
+
+See `SKILL.md` Step 6 for full details on the reference file pattern.
 
 ### Step 6: Cross-Link Everything
 - Video concept → creator concept (in `## Creator`)

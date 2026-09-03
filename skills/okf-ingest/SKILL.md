@@ -1,7 +1,7 @@
 ---
 type: skill
 name: okf-ingest
-description: "Ingest a single URL, YouTube video, or web article into the OKF brain. Triggered when user pastes a single URL (optionally with #hashtags), or says \"ingest this link/video/article\". For YouTube: fetches transcript via yt-dlp, creates creator concept, extracts linked tools/resources. For web: fetches and extracts readable content. NOT for folders of files — use okf-batch-ingest. NOT for YouTube channels — use okf-ingest-channel. NOT for textbooks — use okf-book-ingest."
+description: "Ingest a single URL, YouTube video, or web article into the OKF brain. For YouTube: fetches transcript via yt-dlp, preprocesses VTT into clean prose, extracts knowledge into a concept + deep reference file with grounded external sources (Wikipedia, primary citations), creates creator concept, extracts linked tools/resources. For web: fetches and extracts readable content. NOT for folders of files — use okf-batch-ingest. NOT for YouTube channels — use okf-ingest-channel. NOT for textbooks — use okf-book-ingest."
 ---
 
 # OKF Ingest — Universal Content Ingest Workflow
@@ -110,12 +110,53 @@ These reflect the updated routing (different from earlier versions of this skill
 
 ## YouTube Video Ingest (special handling)
 
-### Step 1: Fetch Metadata + Transcript
+The YouTube pipeline has **two key innovations** beyond simple transcript-to-concept:
+1. **VTT preprocessing** — raw auto-captions are noisy (overlapping cues, `<c>` timing tags, duplicate lines). A Python pass strips tags, dedupes cues, and produces clean prose before reading.
+2. **Concept + Reference split** — the concept file is a concise overview; a `references/` sibling holds the deep knowledge extract with expanded primary sources (Wikipedia, original papers, citations).
+
+### Step 1: Fetch Metadata + Transcript + Preprocess VTT
 ```bash
 yt-dlp --dump-json --write-auto-sub --skip-download --sub-langs en --sub-format vtt -o "/tmp/okf_yt_<videoid>" "URL"
 ```
 Extract from JSON: title, channel, uploader, upload_date, duration, view_count, description, tags.
-Parse VTT file for clean transcript (strip VTT headers, timing lines, HTML tags; deduplicate cues).
+
+**VTT preprocessing** (mandatory — never read raw VTT directly):
+Raw VTT files have `<c>` timing tags, overlapping cues, and duplicate lines. A 5-hour video can produce 74K+ lines of noisy markup. Always preprocess before reading:
+
+```python
+import re, html
+
+def preprocess_vtt(vtt_path: str, output_path: str) -> None:
+    """Strip VTT markup, deduplicate cues, produce clean prose."""
+    with open(vtt_path, 'r') as f:
+        lines = f.readlines()
+
+    seen = set()
+    clean_lines = []
+    in_cue = False
+
+    for line in lines:
+        line = line.strip()
+        # Skip VTT headers, timing lines, cue identifiers
+        if not line or line.startswith('WEBVTT') or line.startswith('NOTE'):
+            continue
+        if re.match(r'^[\d:.\-]+ --> [\d:.\-]+', line):  # timing line
+            in_cue = True
+            continue
+        if in_cue:
+            # Strip HTML tags (<c>, </c>, etc.)
+            text = re.sub(r'<[^>]+>', '', line)
+            text = html.unescape(text).strip()
+            if text and text not in seen:
+                seen.add(text)
+                clean_lines.append(text)
+
+    # Join into paragraphs (cue boundaries = natural sentence breaks)
+    with open(output_path, 'w') as f:
+        f.write('\n'.join(clean_lines))
+```
+
+For long videos (>30 min), split the preprocessed transcript into ~800-word chunks for systematic reading. Read ALL chunks — never sample.
 
 ### Step 2: Creator Concept
 Check if the channel/creator already has a concept:
@@ -165,15 +206,15 @@ For each linked tool/resource (skip social media profiles — they're not tools)
 - Generic YouTube playlist links — not tools
 - Links to other videos on the same channel — not tools
 
-### Step 4: Raw Snapshot
-Write `raw/youtube/<video_id>.md` with:
-- URL, channel, upload date, duration, views, fetch date, method
-- Full description (verbatim)
-- Tags
-- Full verbatim transcript
+### Step 4: Raw Snapshot (VTT only)
+Write the **verbatim VTT file** to `raw/youtube/<video_id>.vtt`:
+```bash
+cp /tmp/okf_yt_<videoid>.en.vtt raw/youtube/<video_id>.vtt
+```
+Do NOT write a plain-text transcript `.md` to `raw/` — the preprocessed transcript is an intermediate working file, not a source artifact. The VTT is the authoritative verbatim snapshot; the knowledge extract lives in `concepts/.../references/` (Step 6).
 
-### Step 5: Create Video Concept
-**Apply FBC:** Read the FULL transcript to determine what the content is ACTUALLY about. Based on the full body, classify into the correct domain/subdomain/subsubdomain per `@core-DOM` and `@core-SUB`. Do NOT rely on keyword matching or tag tables.
+### Step 5: Create Video Concept (overview)
+**Apply FBC:** Read the FULL preprocessed transcript to determine what the content is ACTUALLY about. Based on the full body, classify into the correct domain/subdomain/subsubdomain per `@core-DOM` and `@core-SUB`. Do NOT rely on keyword matching or tag tables.
 
 Write to `concepts/<dom>/<sub>/<ssub>/<slug>.md` or `concepts/<dom>/<sub>/<slug>.md` or `concepts/<dom>/<slug>.md` depending on classification depth:
 
@@ -186,22 +227,27 @@ description: <one-line summary of the ACTUAL content, not just the title>
 domain: learning
 tags: [<parsed hashtags + auto tags>]
 source:
-  - youtube:watch?v=<video_id>
-timestamp: <today>
+  - https://www.youtube.com/watch?v=<video_id>
+generated:
+  by: agent:harness
+  at: <ISO timestamp>
 status: active
 ---
 ```
 
-Body structure:
+**Concept body = concise overview** (~50-80 lines). Structure:
 - `# Title`
-- `## Summary` — channel, date, duration, views, main idea (from ACTUAL transcript, not description)
-- `## Key Concepts` — core thesis with examples from transcript
-- `## Creator` — link to creator concept: `[<Channel Name>](/concepts/creators/<slug>.md)`
-- `## Linked Tools & Resources` — list each extracted tool with its concept link
+- One-paragraph summary: channel, duration, main thesis (from ACTUAL transcript, not description)
+- Link to the deep reference file:
+  ```markdown
+  > **Full knowledge extract with expanded primary sources:** [Title — Knowledge Reference](/concepts/<dom>/<sub>/references/<slug>.md)
+  ```
+- Structured outline of the content (sections with one-line summaries, not full extracts)
 - `## Related Concepts` — cross-link to existing OKF concepts
-- `## References` — original video URL
-- Search existing OKF concepts for related topics → add cross-links
-- Add back-links from related concepts to the new video concept
+- `## Citations` — original video URL + key references
+
+Search existing OKF concepts for related topics → add cross-links.
+Add back-links from related concepts to the new video concept.
 
 ### Step 5b: Tag Audit
 After creating the concept, review all tags on the new concept:
@@ -223,6 +269,64 @@ After creating any concept, update its parent hub file at the correct depth (mat
 2. Add a link to the new concept in the appropriate tag section
 3. Hub link labels must use `clean_title()` — strip markdown images/links/bold/italic/brackets/parens from frontmatter titles before using as link text
 4. The domain hub auto-covers the new concept via its link to the subdomain hub — no update needed unless a new subdomain is created
+
+### Step 6: Create Deep Reference File (knowledge extraction with sources)
+
+**This is the core knowledge extraction step.** The reference file is NOT a transcript — it's a structured knowledge extract that expands on every concept mentioned in the source with grounded primary sources.
+
+**Folder pattern:** Create a `references/` subfolder within the concept's domain/subdomain:
+```
+concepts/<dom>/<sub>/references/<slug>.md
+```
+Or for subsubdomain:
+```
+concepts/<dom>/<sub>/<ssub>/references/<slug>.md
+```
+
+**Reference file frontmatter** (same schema as concept, different title/description):
+```yaml
+---
+type: learning
+visibility: shareable
+title: "<video title> — Knowledge Reference"
+description: "Deep knowledge extract with expanded primary sources from <creator>'s <duration> <content type>."
+domain: <same domain as concept>
+tags: [<same tags as concept>]
+source:
+  - <same source URL as concept>
+generated:
+  by: agent:harness
+  at: <ISO timestamp>
+status: active
+---
+```
+
+**Reference body structure:**
+- `# <Title> — Knowledge Reference`
+- `> **Parent concept:** [<concept title>](/concepts/<dom>/<sub>/<slug>.md)` (bidirectional link)
+- Full structured knowledge extract organized by the source's natural divisions (parts, chapters, themes)
+- For **each concept/principle/technique** mentioned in the source:
+  1. **Extract the teaching** — what the source actually says, with examples and key data points
+  2. **Expand with grounded sources** — trace each concept to its origin:
+     - **Primary sources:** original paper/book author, date, title, journal
+     - **Historical context:** who formulated it, when, why
+     - **Related work:** key papers that extended or challenged it
+  3. **Cross-link** to existing OKF concepts where applicable
+- `## Citations` — numbered reference list with full bibliographic entries
+
+**Source expansion methods:**
+- `read` Wikipedia articles directly (e.g., `read("https://en.wikipedia.org/wiki/Planning_fallacy")`) — this works even when `web_search` is blocked
+- Search existing vault concepts (`okf search "<concept name>"`) for prior knowledge to cross-link
+- For well-known concepts (Bayes' theorem, Goodhart's law, etc.), the reference should include: original author, year, paper title, original formulation/quote, key extensions
+
+**When to write a reference file:**
+- Video/course/podcast >15 minutes with substantive teachings (not just entertainment)
+- Always for educational, technical, or lecture content
+- Skip for short clips, entertainment, or news roundup videos
+
+**When NOT to write a reference file:**
+- Short videos (<15 min) with a single simple idea — fold into the concept body
+- Entertainment content with no extractable knowledge
 
 ### Step 6b: Theme Reconciliation
 Check whether the newly created concept(s) belong to existing themes and update theme data:
@@ -247,7 +351,7 @@ python3 tools/okf.py relink  # only if dry-run shows rewrites
 ```
 
 ### Step 8: Log Entry
-Append `log.md` entry listing ALL concepts created (video + tools + creator).
+Append `log.md` entry listing ALL concepts created (video concept + reference file + tools + creator). Note the references/ pattern used.
 
 ## Web Article Ingest
 

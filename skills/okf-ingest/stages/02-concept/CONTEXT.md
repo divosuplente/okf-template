@@ -12,10 +12,31 @@ type: skill
 - `skills/okf-ingest/SKILL.md` for YT/web special cases (creator, linked tools)
 
 ## Outputs (write)
-- Primary: `concepts/<domain>/<sub>/<…>/<slug>.md`
-- Optional: creator `concepts/creators/…`, linked tool concepts, hub link updates
+| Kind | Path pattern |
+|------|-------------|
+| Primary concept | `concepts/<domain>/<sub>/<…>/<slug>.md` (concise overview, ~50-80 lines) |
+| Deep reference (optional) | `concepts/<domain>/<sub>/references/<slug>.md` (or `.../<ssub>/references/<slug>.md`) |
+| Creator | `concepts/creators/…` when applicable |
+| Linked tools | Per-tool concepts per FBC |
+
 - Frontmatter **required**: `type`, `visibility` (explicit)
-- Recommended: `title`, `description`, `domain`, `tags`, `source`, `timestamp`, `status`
+- Recommended: `title`, `description`, `domain`, `tags`, `source`, `generated`, `status`
+
+## Concept + Reference split
+For substantive content (videos >15 min, courses, lectures, technical talks), split output into two files:
+1. **Concept file** (overview): concise summary + structured outline + cross-links + link to reference
+2. **Reference file** (deep extract): full knowledge extraction with expanded primary sources
+
+The reference file is NOT a transcript. It extracts teachings and expands each concept with:
+- Original author, year, paper/book title
+- Historical context and original formulation
+- Key extensions and related work
+- `read` Wikipedia articles directly for source expansion (works even when `web_search` is blocked)
+- Search existing vault concepts (`okf search`) for cross-link targets
+
+Bidirectional links: concept → reference (`> **Full knowledge extract...:** [link]`) and reference → concept (`> **Parent concept:** [link]`).
+
+Skip reference file for short videos (<15 min) or entertainment content with no extractable knowledge.
 
 ## Classification rules (non-negotiable)
 
@@ -37,8 +58,10 @@ Shared reference (extensible, not a cage): `_config/taxonomy.md`.
 ## Done when
 - [ ] Concept path matches FBC
 - [ ] FM valid; tags cleaned
+- [ ] Concept is concise overview (not full extract) when a reference file is also created
+- [ ] Reference file created for substantive content (if applicable), with expanded sources and bidirectional link
 - [ ] Hub entry added/updated when required by skill
-- [ ] List of all concept paths created this run (for stage 04 log)
+- [ ] List of all concept + reference paths created this run (for stage 04 log)
 
 ## Human gate
 Review title, domain path, and visibility before cleanup if classification is ambiguous.
